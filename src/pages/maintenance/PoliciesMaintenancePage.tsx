@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, TextField, Typography } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, Tab, Tabs, TextField, Typography } from '@mui/material'
 import type { GridColDef } from '@mui/x-data-grid'
 import { Edit2, FileText, MoreVertical, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -13,7 +12,10 @@ import { createPolicy, fetchClients, fetchPolicies, fetchProducts, fetchProvider
 import type { PolicyRaw, ClientRaw, ProviderRaw, ProductRaw } from '../../api/maintenanceApi'
 import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
+import { ResponsiveDataGrid } from '../../components/ResponsiveDataGrid'
+import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { esESGrid, policyStatusLabels, t } from '../../utils/enumLabels'
+import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 
 const policySchema = z.object({
   policyNumber: z.string().min(2, 'El número de póliza es requerido'),
@@ -33,15 +35,59 @@ type PolicyFormData = z.infer<typeof policySchema>
 
 export function PoliciesMaintenancePage() {
   const { data: policies, error, loading, refetch } = useApiQuery('policies', fetchPolicies)
+  const canViewPolicies = usePermission('view_policies')
+  const canManagePolicies = usePermission('manage_policies')
   const { data: clients } = useApiQuery('clients-for-select', fetchClients)
   const { data: providers } = useApiQuery('providers-for-select', fetchProviders)
   const { data: products } = useApiQuery('products-for-select', fetchProducts)
+  const permissionsLoading = usePermissionLoading()
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [selected, setSelected] = useState<PolicyRaw | null>(null)
 
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<number>(0)
+
+  const nearExpiringCount = useMemo(() => {
+    const now = dayjs()
+    return (policies ?? []).filter((p) => {
+      if (!p.endDate) return false
+      const end = dayjs(p.endDate)
+      const daysDiff = end.diff(now, 'day')
+      return (p.status === 'Active' || p.status === 'PendingRenewal') && daysDiff >= 0 && daysDiff <= 30
+    }).length
+  }, [policies])
+
+  const expiredCount = useMemo(() => {
+    const now = dayjs()
+    return (policies ?? []).filter((p) => {
+      if (p.status === 'Expired') return true
+      if (!p.endDate) return false
+      return dayjs(p.endDate).isBefore(now, 'day')
+    }).length
+  }, [policies])
+
+  const filteredPolicies = useMemo(() => {
+    let list = policies ?? []
+    if (activeTab === 1) {
+      const now = dayjs()
+      list = list.filter((p) => {
+        if (!p.endDate) return false
+        const end = dayjs(p.endDate)
+        const daysDiff = end.diff(now, 'day')
+        return (p.status === 'Active' || p.status === 'PendingRenewal') && daysDiff >= 0 && daysDiff <= 30
+      })
+    } else if (activeTab === 2) {
+      const now = dayjs()
+      list = list.filter((p) => {
+        if (p.status === 'Expired') return true
+        if (!p.endDate) return false
+        return dayjs(p.endDate).isBefore(now, 'day')
+      })
+    }
+    return list
+  }, [policies, activeTab])
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -152,28 +198,55 @@ export function PoliciesMaintenancePage() {
     { field: 'client', headerName: 'Cliente', flex: 1, minWidth: 180, valueGetter: (_v, row) => row.client?.displayName ?? '—' },
     { field: 'product', headerName: 'Producto', flex: 1, minWidth: 150, valueGetter: (_v, row) => row.product?.name ?? '—' },
     { field: 'provider', headerName: 'Proveedor', width: 160, valueGetter: (_v, row) => row.provider?.name ?? '—' },
-    { field: 'startDate', headerName: 'Inicio', width: 120 },
-    { field: 'endDate', headerName: 'Vencimiento', width: 120 },
-    { field: 'currency', headerName: 'Moneda', width: 80 },
     {
-      field: 'premiumAmount', headerName: 'Prima', width: 120, type: 'number',
-      valueFormatter: (value) => value != null ? `$${Number(value).toLocaleString()}` : '—',
+      field: 'startDate',
+      headerName: 'Inicio',
+      width: 120,
+      type: 'date',
+      valueGetter: (value) => value ? new Date(value as string) : null,
+      valueFormatter: (value) => value ? new Date(value as Date).toLocaleDateString('es-GT') : '—',
     },
     {
-      field: 'status', headerName: 'Estado', width: 170,
+      field: 'endDate',
+      headerName: 'Vencimiento',
+      width: 120,
+      type: 'date',
+      valueGetter: (value) => value ? new Date(value as string) : null,
+      valueFormatter: (value) => value ? new Date(value as Date).toLocaleDateString('es-GT') : '—',
+    },
+    { field: 'currency', headerName: 'Moneda', width: 80 },
+    {
+      field: 'premiumAmount', headerName: 'Prima', width: 140, type: 'number',
+      renderCell: (params) => {
+        if (params.row.premiumAmount == null) return '—'
+        const currency = params.row.currency ?? 'USD'
+        let symbol = '$'
+        if (currency === 'GTQ') symbol = 'Q'
+        else if (currency === 'EUR') symbol = '€'
+        else if (currency !== 'USD') symbol = `${currency} `
+        return (
+          <span style={{ fontWeight: 600 }}>
+            {symbol}{Number(params.row.premiumAmount).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        )
+      }
+    },
+    {
+      field: 'status', headerName: 'Estado', width: 170, type: 'singleSelect',
+      valueOptions: Object.entries(policyStatusLabels).map(([value, label]) => ({ value, label })),
       renderCell: (params) => {
         const colors = getStatusColor(params.row.status)
         return <Chip label={t(policyStatusLabels, params.row.status)} size="small" sx={{ fontWeight: 600, ...colors }} />
       },
     },
-    {
+    ...(canManagePolicies ? [{
       field: 'actions', headerName: '', width: 60, sortable: false,
-      renderCell: (params) => (
+      renderCell: (params: any) => (
         <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelected(params.row) }} sx={{ color: 'text.secondary' }}>
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ]
 
   const selectedProviderUuid = watch('providerUuid')
@@ -192,50 +265,78 @@ export function PoliciesMaintenancePage() {
     }
   }, [products, selectedProductUuid, selectedProviderUuid, setValue])
 
+  if (permissionsLoading) {
+    return <MaintenanceSkeleton layout="table" />
+  }
+
+  if (!canViewPolicies) {
+    return (
+      <Alert severity="error" sx={{ mt: 4, borderRadius: 2 }}>
+        Acceso denegado. No tiene permisos para ver las pólizas.
+      </Alert>
+    )
+  }
+
   return (
     <Stack spacing={4} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }} className="flex-wrap gap-4">
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Pólizas" description="Contratos, vigencias, documentos y renovaciones." actionLabel="" icon={FileText} />
         </Box>
-        <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-          Nueva póliza
-        </Button>
+        {canManagePolicies && (
+          <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
+            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
+            Nueva póliza
+          </Button>
+        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de pólizas.</Alert>}
 
-      <Box sx={{ height: 600, width: '100%', bgcolor: 'background.paper', borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.05)', border: '1px solid', borderColor: 'divider' }}>
-        <DataGrid
-          rows={policies ?? []}
-          columns={columns}
-          getRowId={(row) => row.uuid}
-          loading={loading}
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[10, 25, 50]}
-          disableRowSelectionOnClick
-          localeText={esESGrid}
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600, color: 'text.secondary' },
-            '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', color: 'text.primary' },
-            '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' },
-          }}
-        />
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, val) => setActiveTab(val)}
+          textColor="primary"
+          indicatorColor="primary"
+        >
+          <Tab label={`Todas (${policies?.length ?? 0})`} />
+          <Tab 
+            label={`Próximas a vencer (${nearExpiringCount})`} 
+            sx={{ 
+              color: nearExpiringCount > 0 ? 'warning.main' : 'inherit',
+              '&.Mui-selected': { color: 'warning.main', fontWeight: 'bold' }
+            }} 
+          />
+          <Tab 
+            label={`Vencidas / Expiradas (${expiredCount})`} 
+            sx={{ 
+              color: expiredCount > 0 ? 'error.main' : 'inherit',
+              '&.Mui-selected': { color: 'error.main', fontWeight: 'bold' }
+            }} 
+          />
+        </Tabs>
       </Box>
+
+      <ResponsiveDataGrid
+        rows={filteredPolicies}
+        columns={columns}
+        getRowId={(row) => row.uuid}
+        loading={loading}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        localeText={esESGrid}
+      />
 
       {/* Action Menu */}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
         slotProps={{ paper: { elevation: 0, sx: { borderRadius: 3, minWidth: 140, border: '1px solid', borderColor: 'divider', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } } }}>
-        <MenuItem onClick={openEdit} sx={{ color: 'text.primary' }}>
+        {canManagePolicies && <MenuItem onClick={openEdit} sx={{ color: 'text.primary' }}>
           <Edit2 size={16} className="mr-2" style={{ opacity: 0.7 }} /> Editar
-        </MenuItem>
-        <MenuItem onClick={openDelete} sx={{ color: 'error.main' }}>
+        </MenuItem>}
+        {canManagePolicies && <MenuItem onClick={openDelete} sx={{ color: 'error.main' }}>
           <Trash2 size={16} className="mr-2" /> Eliminar
-        </MenuItem>
+        </MenuItem>}
       </Menu>
 
       {/* Form Dialog */}

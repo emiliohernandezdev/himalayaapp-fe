@@ -9,6 +9,8 @@ import { createTag, fetchTags, removeTag, updateTag } from '../../api/maintenanc
 import type { TagRaw } from '../../api/maintenanceApi'
 import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
+import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
+import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 
 const colorPresets = [
   '#075985',
@@ -35,6 +37,9 @@ type TagFormData = z.infer<typeof tagSchema>
 
 export function TagsMaintenancePage() {
   const { data: tags, error, loading, refetch } = useApiQuery('tags', fetchTags)
+  const canViewTags = usePermission('view_tags')
+  const canManageTags = usePermission('manage_tags')
+  const permissionsLoading = usePermissionLoading()
   const [page, setPage] = useState(1)
   const pageSize = 12
   const allTags = tags ?? []
@@ -104,16 +109,30 @@ export function TagsMaintenancePage() {
     }
   }
 
+  if (permissionsLoading) {
+    return <MaintenanceSkeleton layout="grid" />
+  }
+
+  if (!canViewTags) {
+    return (
+      <Alert severity="error" sx={{ mt: 4, borderRadius: 2 }}>
+        Acceso denegado. No tiene permisos para ver las etiquetas.
+      </Alert>
+    )
+  }
+
   return (
     <Stack spacing={4} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }} className="flex-wrap gap-4">
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Etiquetas" description="Clasificación visual para casos y seguimiento." actionLabel="" icon={Tags} />
         </Box>
-        <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-          Nueva etiqueta
-        </Button>
+        {canManageTags && (
+          <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
+            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
+            Nueva etiqueta
+          </Button>
+        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar las etiquetas.</Alert>}
@@ -142,9 +161,11 @@ export function TagsMaintenancePage() {
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }} noWrap>{tag.name}</Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>{tag.description || tag.color}</Typography>
                 </Box>
-                <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelected(tag) }} sx={{ color: 'text.secondary', flexShrink: 0 }}>
-                  <MoreVertical size={16} />
-                </IconButton>
+                {canManageTags && (
+                  <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelected(tag) }} sx={{ color: 'text.secondary', flexShrink: 0 }}>
+                    <MoreVertical size={16} />
+                  </IconButton>
+                )}
               </Box>
             ))}
       </Box>

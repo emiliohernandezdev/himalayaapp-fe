@@ -18,12 +18,14 @@ export type ModuleAccess = {
   route: string
   icon: string
   nickname: string
+  moduleNickname: string
   logoDataUrl?: string | null
 }
 
 export type NodeAccess = {
   slug: string
   title: string
+  nickname: string
   description: string
   logoDataUrl?: string | null
   modules: ModuleAccess[]

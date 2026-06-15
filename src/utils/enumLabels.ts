@@ -1,4 +1,5 @@
 /** Spanish label maps for all backend enum values */
+import { esES as dataGridEsES } from '@mui/x-data-grid/locales'
 
 export const providerStatusLabels: Record<string, string> = {
   Active: 'Activo',
@@ -84,6 +85,25 @@ export const caseTypeLabels: Record<string, string> = {
   GeneralSupport: 'Soporte General',
 }
 
+export const userRoleLabels: Record<string, string> = {
+  owner: 'Propietario',
+  Owner: 'Propietario',
+  administrator: 'Administrador',
+  Administrator: 'Administrador',
+  manager: 'Gerente',
+  Manager: 'Gerente',
+  supervisor: 'Supervisor',
+  Supervisor: 'Supervisor',
+  assistant: 'Asistente',
+  Assistant: 'Asistente',
+  billing: 'Facturación',
+  Billing: 'Facturación',
+  agent: 'Agente',
+  Agent: 'Agente',
+  auditor: 'Auditor',
+  Auditor: 'Auditor',
+}
+
 /** Generic helper: translate or return original value */
 export function t(map: Record<string, string>, value: string | undefined | null): string {
   if (!value) return '—'
@@ -91,6 +111,7 @@ export function t(map: Record<string, string>, value: string | undefined | null)
 }
 
 export const esESGrid = {
+  ...dataGridEsES.components.MuiDataGrid.defaultProps.localeText,
   noRowsLabel: 'No hay filas',
   noResultsOverlayLabel: 'No se encontraron resultados.',
   toolbarDensity: 'Densidad',

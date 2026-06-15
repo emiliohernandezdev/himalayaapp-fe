@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, TextField, Typography } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
 import type { GridColDef } from '@mui/x-data-grid'
 import { Edit2, MoreVertical, PackageCheck, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
@@ -11,7 +10,10 @@ import { createProduct, fetchProducts, fetchProviders, removeProduct, updateProd
 import type { ProductRaw, ProviderRaw } from '../../api/maintenanceApi'
 import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
+import { ResponsiveDataGrid } from '../../components/ResponsiveDataGrid'
+import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { esESGrid, productCategoryLabels, productStatusLabels, t } from '../../utils/enumLabels'
+import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 
 const productSchema = z.object({
   name: z.string().min(2, 'El nombre es requerido (mínimo 2 caracteres)'),
@@ -26,7 +28,10 @@ type ProductFormData = z.infer<typeof productSchema>
 
 export function ProductsMaintenancePage() {
   const { data: products, error, loading, refetch } = useApiQuery('products', fetchProducts)
+  const canViewProducts = usePermission('view_products')
+  const canManageProducts = usePermission('manage_products')
   const { data: providers } = useApiQuery('providers-for-select', fetchProviders)
+  const permissionsLoading = usePermissionLoading()
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
@@ -106,11 +111,13 @@ export function ProductsMaintenancePage() {
       valueGetter: (_value, row) => row.provider?.name ?? '(sin proveedor)',
     },
     {
-      field: 'category', headerName: 'Categoría', width: 150,
-      valueGetter: (_value, row) => t(productCategoryLabels, row.category),
+      field: 'category', headerName: 'Categoría', width: 150, type: 'singleSelect',
+      valueOptions: Object.entries(productCategoryLabels).map(([value, label]) => ({ value, label })),
+      valueFormatter: (value) => t(productCategoryLabels, value as string),
     },
     {
-      field: 'status', headerName: 'Estado', width: 130,
+      field: 'status', headerName: 'Estado', width: 130, type: 'singleSelect',
+      valueOptions: Object.entries(productStatusLabels).map(([value, label]) => ({ value, label })),
       renderCell: (params) => (
         <Chip
           label={t(productStatusLabels, params.row.status)}
@@ -123,15 +130,27 @@ export function ProductsMaintenancePage() {
         />
       ),
     },
-    {
+    ...(canManageProducts ? [{
       field: 'actions', headerName: '', width: 60, sortable: false,
-      renderCell: (params) => (
+      renderCell: (params: any) => (
         <IconButton size="small" onClick={(e) => { e.stopPropagation(); setAnchorEl(e.currentTarget); setSelected(params.row) }} sx={{ color: 'text.secondary' }}>
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ]
+
+  if (permissionsLoading) {
+    return <MaintenanceSkeleton layout="table" />
+  }
+
+  if (!canViewProducts) {
+    return (
+      <Alert severity="error" sx={{ mt: 4, borderRadius: 2 }}>
+        Acceso denegado. No tiene permisos para ver los productos.
+      </Alert>
+    )
+  }
 
   return (
     <Stack spacing={4} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -139,44 +158,36 @@ export function ProductsMaintenancePage() {
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Productos" description="Productos de seguro asociados a proveedores y ramos." actionLabel="" icon={PackageCheck} />
         </Box>
-        <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-          Nuevo producto
-        </Button>
+        {canManageProducts && (
+          <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
+            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
+            Nuevo producto
+          </Button>
+        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de productos.</Alert>}
 
-      <Box sx={{ height: 580, width: '100%', bgcolor: 'background.paper', borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.05)', border: '1px solid', borderColor: 'divider' }}>
-        <DataGrid
-          rows={products ?? []}
-          columns={columns}
-          getRowId={(row) => row.uuid}
-          loading={loading}
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[10, 25, 50]}
-          disableRowSelectionOnClick
-          localeText={esESGrid}
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600, color: 'text.secondary' },
-            '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', color: 'text.primary' },
-            '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' },
-          }}
-        />
-      </Box>
+      <ResponsiveDataGrid
+        height={580}
+        rows={products ?? []}
+        columns={columns}
+        getRowId={(row) => row.uuid}
+        loading={loading}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        localeText={esESGrid}
+      />
 
       {/* Context Menu */}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
         slotProps={{ paper: { elevation: 0, sx: { borderRadius: 3, minWidth: 140, border: '1px solid', borderColor: 'divider', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } } }}>
-        <MenuItem onClick={openEdit} sx={{ color: 'text.primary' }}>
+        {canManageProducts && <MenuItem onClick={openEdit} sx={{ color: 'text.primary' }}>
           <Edit2 size={16} className="mr-2" style={{ opacity: 0.7 }} /> Editar
-        </MenuItem>
-        <MenuItem onClick={openDelete} sx={{ color: 'error.main' }}>
+        </MenuItem>}
+        {canManageProducts && <MenuItem onClick={openDelete} sx={{ color: 'error.main' }}>
           <Trash2 size={16} className="mr-2" /> Eliminar
-        </MenuItem>
+        </MenuItem>}
       </Menu>
 
       {/* Create / Edit Dialog */}

@@ -9,7 +9,9 @@ import { createProvider, fetchProviders, removeProvider, updateProvider } from '
 import type { ProviderRaw } from '../../api/maintenanceApi'
 import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
+import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { providerStatusLabels, providerTypeLabels, t } from '../../utils/enumLabels'
+import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 
 const providerSchema = z.object({
   name: z.string().min(2, 'Mínimo 2 caracteres'),
@@ -27,6 +29,9 @@ type ProviderFormData = z.infer<typeof providerSchema>
 
 export function ProvidersMaintenancePage() {
   const { data: records, error, loading, refetch } = useApiQuery('providers', fetchProviders)
+  const canViewProviders = usePermission('view_providers')
+  const canManageProviders = usePermission('manage_providers')
+  const permissionsLoading = usePermissionLoading()
 
   const [page, setPage] = useState(1)
   const pageSize = 12
@@ -107,16 +112,30 @@ export function ProvidersMaintenancePage() {
     }
   }
 
+  if (permissionsLoading) {
+    return <MaintenanceSkeleton layout="grid" />
+  }
+
+  if (!canViewProviders) {
+    return (
+      <Alert severity="error" sx={{ mt: 4, borderRadius: 2 }}>
+        Acceso denegado. No tiene permisos para ver los proveedores.
+      </Alert>
+    )
+  }
+
   return (
     <Stack spacing={4} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }} className="flex-wrap gap-4">
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Proveedores" description="Aseguradoras, afianzadoras y contactos comerciales." actionLabel="" icon={Building2} />
         </Box>
-        <Button variant="contained" color="primary" startIcon={<Plus size={20} />} onClick={openCreate}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-          Nuevo proveedor
-        </Button>
+        {canManageProviders && (
+          <Button variant="contained" color="primary" startIcon={<Plus size={20} />} onClick={openCreate}
+            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
+            Nuevo proveedor
+          </Button>
+        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de proveedores.</Alert>}
@@ -149,9 +168,11 @@ export function ProvidersMaintenancePage() {
                       ? <img src={provider.logo} alt={provider.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                       : <Building2 size={24} color="var(--mui-palette-primary-main)" />}
                   </Box>
-                  <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelected(provider) }} sx={{ color: 'text.secondary', mr: -1, mt: -1 }}>
-                    <MoreVertical size={18} />
-                  </IconButton>
+                  {canManageProviders && (
+                    <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelected(provider) }} sx={{ color: 'text.secondary', mr: -1, mt: -1 }}>
+                      <MoreVertical size={18} />
+                    </IconButton>
+                  )}
                 </Stack>
 
                 <Box sx={{ flexGrow: 1 }}>

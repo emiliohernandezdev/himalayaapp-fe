@@ -10,6 +10,7 @@ import { HimalayaLogo } from './HimalayaLogo'
 import { getMaintenanceModuleIcon } from './maintenanceModuleIcons'
 import { useAuthStore } from '../store/useAuthStore'
 import { useMaintenanceDrawerStore } from '../store/useMaintenanceDrawerStore'
+import { usePermission } from '../hooks/usePermission'
 
 type MaintenanceDrawerProps = {
   open: boolean
@@ -102,7 +103,7 @@ const securityModules: MaintenanceModuleDto[] = [
     slug: 'security-roles',
     title: 'Roles',
     description: 'Administra jerarquias y perfiles base para accesos del sistema.',
-    route: '/security',
+    route: '/security/roles',
     icon: 'ShieldCheck',
     tone: 'indigo',
     sortOrder: 30,
@@ -112,7 +113,7 @@ const securityModules: MaintenanceModuleDto[] = [
     slug: 'security-matrix',
     title: 'Matriz de seguridad',
     description: 'Define accesos por nodo, modulo, mantenimiento y accion sensible.',
-    route: '/security',
+    route: '/security/matrix',
     icon: 'KeyRound',
     tone: 'violet',
     sortOrder: 40,
@@ -122,7 +123,7 @@ const securityModules: MaintenanceModuleDto[] = [
     slug: 'security-audit',
     title: 'Historico general',
     description: 'Consulta acciones importantes, autorizaciones y cambios de informacion.',
-    route: '/security',
+    route: '/security/audit',
     icon: 'Activity',
     tone: 'teal',
     sortOrder: 50,
@@ -142,19 +143,60 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
   const modules = isSecurityModule ? securityModules : moduleData ?? []
   const normalizedQuery = query.trim().toLowerCase()
 
+  const canViewProviders = usePermission('view_providers')
+  const canViewClients = usePermission('view_clients')
+  const canViewProducts = usePermission('view_products')
+  const canViewPolicies = usePermission('view_policies')
+  const canViewCases = usePermission('view_cases')
+  const canViewTags = usePermission('view_tags')
+
+  const canManageUsers = usePermission('manage_users')
+  const canManageRoles = usePermission('manage_roles')
+  const canManageSecurityMatrix = usePermission('manage_security_matrix')
+  const canViewAuditLog = usePermission('view_audit_log')
+
+  const allowedModules = useMemo(() => {
+    return modules.filter((module) => {
+      if (module.slug === 'providers') return canViewProviders
+      if (module.slug === 'clients') return canViewClients
+      if (module.slug === 'products') return canViewProducts
+      if (module.slug === 'policies') return canViewPolicies
+      if (module.slug === 'cases') return canViewCases
+      if (module.slug === 'tags') return canViewTags
+
+      if (module.slug === 'security-users') return canManageUsers
+      if (module.slug === 'security-roles') return canManageRoles
+      if (module.slug === 'security-matrix') return canManageSecurityMatrix
+      if (module.slug === 'security-audit') return canViewAuditLog
+      return true
+    })
+  }, [
+    modules,
+    canViewProviders,
+    canViewClients,
+    canViewProducts,
+    canViewPolicies,
+    canViewCases,
+    canViewTags,
+    canManageUsers,
+    canManageRoles,
+    canManageSecurityMatrix,
+    canViewAuditLog,
+  ])
+
   const visibleModules = useMemo(() => {
     if (view === 'favorites') {
-      return modules.filter((module) => favoriteRoutes.includes(module.route))
+      return allowedModules.filter((module) => favoriteRoutes.includes(module.route))
     }
 
     if (view === 'recent') {
-      return modules
+      return allowedModules
         .filter((module) => recentRoutes.includes(module.route))
         .sort((first, second) => recentRoutes.indexOf(first.route) - recentRoutes.indexOf(second.route))
     }
 
-    return modules
-  }, [favoriteRoutes, modules, recentRoutes, view])
+    return allowedModules
+  }, [favoriteRoutes, allowedModules, recentRoutes, view])
 
   const filteredModules = useMemo(
     () =>

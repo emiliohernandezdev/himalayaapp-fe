@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import 'dayjs/locale/es'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { Toaster } from 'sonner'
 import { AppShell } from './components/AppShell'
@@ -17,6 +18,9 @@ import { PoliciesPage } from './pages/PoliciesPage'
 import { TasksPage } from './pages/TasksPage'
 import { UsersPage } from './pages/UsersPage'
 import { SecurityDashboardPage } from './pages/security/SecurityDashboardPage'
+import { SecurityAuditPage } from './pages/security/SecurityAuditPage'
+import { SecurityMatrixPage } from './pages/security/SecurityMatrixPage'
+import { RolesPage } from './pages/security/RolesPage'
 import { createHimalayaTheme } from './theme/himalayaTheme'
 import { useThemeModeStore } from './store/useThemeModeStore'
 
@@ -27,7 +31,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
         <Toaster theme={mode} position="bottom-right" richColors />
         <BrowserRouter>
           <Routes>
@@ -35,6 +39,9 @@ function App() {
             <Route path="/select-module" element={<Navigate to="/login" replace />} />
             <Route element={<AppShell mode={mode} onToggleMode={toggleMode} />}>
               <Route path="/security" element={<SecurityDashboardPage />} />
+              <Route path="/security/roles" element={<RolesPage />} />
+              <Route path="/security/matrix" element={<SecurityMatrixPage />} />
+              <Route path="/security/audit" element={<SecurityAuditPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/users" element={<UsersPage />} />

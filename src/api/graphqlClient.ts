@@ -34,7 +34,7 @@ export async function graphqlRequest<TData>(operationId: GraphqlOperationId, var
   const payload = (await response.json()) as GraphqlResponse<TData>
 
   if (payload.errors?.length) {
-    throw new Error('No se pudo completar la solicitud.')
+    throw new Error(payload.errors.map((error) => error.message).join('\n'))
   }
 
   if (!payload.data) {

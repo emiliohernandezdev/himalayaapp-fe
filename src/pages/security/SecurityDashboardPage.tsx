@@ -10,30 +10,35 @@ const securityTiles = [
     description: 'Altas, perfiles, estado de acceso y roles base.',
     icon: UsersRound,
     status: 'Disponible',
+    route: '/users',
   },
   {
     title: 'Roles',
     description: 'Agrupaciones de permisos y jerarquias de autorizacion.',
     icon: ShieldCheck,
     status: 'Base',
+    route: '/security/roles',
   },
   {
     title: 'Matriz de seguridad',
     description: 'Permitir o bloquear mantenimientos y acciones por rol.',
     icon: LockKeyhole,
-    status: 'Diseño inicial',
+    status: 'Activo',
+    route: '/security/matrix',
   },
   {
     title: 'Autorizaciones',
     description: 'Acciones que requieren contraseña de supervisor.',
     icon: KeyRound,
     status: 'Activo',
+    route: '/security/matrix',
   },
   {
     title: 'Historico general',
-    description: 'Auditoria de acciones realizadas dentro del sistema.',
+    description: 'Auditoría de acciones realizadas dentro del sistema.',
     icon: Activity,
-    status: 'Base',
+    status: 'Activo',
+    route: '/security/audit',
   },
 ]
 
@@ -44,7 +49,7 @@ export function SecurityDashboardPage() {
     <Stack spacing={4} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <PageHeader
         title="Security"
-        description="Usuarios, roles, matriz de seguridad, autorizaciones y auditoria."
+        description="Usuarios, roles, matriz de seguridad, autorizaciones y auditoría."
         actionLabel=""
         icon={LockKeyhole}
       />
@@ -72,6 +77,9 @@ export function SecurityDashboardPage() {
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
                     {tile.description}
                   </Typography>
+                  <Button href={tile.route} size="small" sx={{ mt: 2 }}>
+                    Abrir
+                  </Button>
                 </Box>
               </Stack>
             </Box>

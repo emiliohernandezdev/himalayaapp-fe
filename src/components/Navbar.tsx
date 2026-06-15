@@ -8,6 +8,7 @@ import { MaintenanceDrawer } from './MaintenanceDrawer'
 import { useAuthStore } from '../store/useAuthStore'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { userRoleLabels } from '../api/securityApi'
 
 type NavbarProps = {
   mode: PaletteMode
@@ -24,6 +25,7 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
   const navigate = useNavigate()
   const moduleCount = accessNodes.reduce((count, node) => count + node.modules.length, 0)
   const activeModule = accessNodes.flatMap((node) => node.modules).find((module) => module.slug === activeModuleSlug)
+  const activeNode = accessNodes.find((node) => node.modules.some((module) => module.slug === activeModuleSlug))
 
   const handleLogout = () => {
     logout()
@@ -51,7 +53,7 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
             <HimalayaLogo className="h-9 w-12 shrink-0 sm:h-11 sm:w-15" />
             <Box className="min-w-0" sx={{ mr: { xs: 0.5, sm: 1 } }}>
               <Typography variant="h6" component="h1" sx={{ fontWeight: 850, fontSize: { xs: '1.05rem', sm: '1.25rem' } }} className="truncate">
-                Himalaya
+                Himalaya {activeNode ? `(${activeNode.nickname})` : ''}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' }, fontSize: '0.75rem' }} className="truncate">
                 {activeModule ? activeModule.title : 'Administracion de seguros y fianzas'}
@@ -109,7 +111,7 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
                         {user.firstName} {user.lastName}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textTransform: 'capitalize', fontSize: '0.68rem', lineHeight: 1 }}>
-                        {user.roles.join(', ')}
+                        {user.roles.map((r) => userRoleLabels[r] ?? r).join(', ')}
                       </Typography>
                     </Box>
                   </Stack>
@@ -162,7 +164,7 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
                       </Typography>
                     )}
                     <Typography variant="caption" sx={{ display: 'inline-block', px: 1, py: 0.25, borderRadius: 1, bgcolor: 'action.selected', color: 'text.secondary', fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase' }}>
-                      {user.roles.join(', ')}
+                      {user.roles.map((r) => userRoleLabels[r] ?? r).join(', ')}
                     </Typography>
                   </Box>
                   <Divider />

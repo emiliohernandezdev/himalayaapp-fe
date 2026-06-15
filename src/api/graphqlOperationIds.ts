@@ -34,11 +34,16 @@ export const graphqlOperationIds = {
   updateSecurityUser: 'aa00100100100103',
   removeSecurityUser: 'aa00100100100104',
   securityRoles: 'aa00100100100105',
+  createSecurityRole: 'aa00100100100114',
   updateSecurityRole: 'aa00100100100106',
+  removeSecurityRole: 'aa00100100100115',
   securityCatalog: 'aa00100100100107',
   securityAccessRules: 'aa00100100100108',
   upsertSecurityAccessRule: 'aa00100100100109',
   removeSecurityAccessRule: 'aa00100100100110',
+  securityAuditLogs: 'aa00100100100111',
+  upsertSecurityAccessRules: 'aa00100100100112',
+  mySecurityAccessRules: 'aa00100100100113',
 } as const
 
 export type GraphqlOperationId =

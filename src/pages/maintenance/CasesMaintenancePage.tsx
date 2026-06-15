@@ -1,9 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Autocomplete, Avatar, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer, FormControlLabel, IconButton, Menu, MenuItem, Select, InputLabel, FormControl, Skeleton, Stack, Tab, Tabs, TextField, Typography, OutlinedInput, alpha } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+import { Alert, Autocomplete, Avatar, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer, FormControlLabel, IconButton, Menu, MenuItem, Skeleton, Stack, Tab, Tabs, TextField, Typography, InputAdornment, alpha } from '@mui/material'
 import type { GridColDef } from '@mui/x-data-grid'
-import { ClipboardCheck, Clock, Edit2, MessageSquare, MoreVertical, Plus, Trash2, X } from 'lucide-react'
-import { useState } from 'react'
+import { ClipboardCheck, Clock, Edit2, MessageSquare, MoreVertical, Plus, Trash2, X, Eye, EyeOff } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
@@ -13,7 +12,10 @@ import { addCommentApi, createCase, fetchCaseDetail, fetchCases, fetchClients, f
 import type { CaseDetail, CaseRaw, ClientRaw, PolicyRaw, UserRaw, TagRaw } from '../../api/maintenanceApi'
 import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
+import { ResponsiveDataGrid } from '../../components/ResponsiveDataGrid'
+import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { casePriorityLabels, caseStatusLabels, caseTypeLabels, esESGrid, t } from '../../utils/enumLabels'
+import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 
 /** Sanitize backend errors for user display */
 function friendlyError(err: any, fallback = 'Ocurrió un error inesperado.'): string {
@@ -88,7 +90,7 @@ function withSelectedOption<T extends { uuid: string }>(
 }
 
 function isSupervisorUser(user: UserRaw) {
-  const privilegedRoles = ['owner', 'administrator', 'manager']
+  const privilegedRoles = ['manager', 'supervisor', 'administrator', 'owner']
   return user.roles.some((role) => privilegedRoles.includes(role.toLowerCase()))
 }
 
@@ -152,11 +154,15 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
   const [newCommentInternal, setNewCommentInternal] = useState(false)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
+  const canEditCase = usePermission('edit_case')
+  const canDeleteCase = usePermission('delete_case')
+
   // Closing case states
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
   const [closeReason, setCloseReason] = useState('')
   const [supervisorEmail, setSupervisorEmail] = useState('')
   const [supervisorPassword, setSupervisorPassword] = useState('')
+  const [showSupervisorPassword, setShowSupervisorPassword] = useState(false)
   const [isSubmittingClose, setIsSubmittingClose] = useState(false)
 
   const { data: detail, loading, refetch } = useApiQuery(
@@ -298,12 +304,16 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
                   {isActivating ? 'Activando…' : 'Re-activar'}
                 </Button>
               )}
-              <IconButton onClick={() => onEdit(detail)} size="small" sx={{ color: 'text.secondary' }}>
-                <Edit2 size={18} />
-              </IconButton>
-              <IconButton onClick={() => onDelete(detail)} size="small" sx={{ color: 'error.main' }}>
-                <Trash2 size={18} />
-              </IconButton>
+              {canEditCase && (
+                <IconButton onClick={() => onEdit(detail)} size="small" sx={{ color: 'text.secondary' }}>
+                  <Edit2 size={18} />
+                </IconButton>
+              )}
+              {canDeleteCase && (
+                <IconButton onClick={() => onDelete(detail)} size="small" sx={{ color: 'error.main' }}>
+                  <Trash2 size={18} />
+                </IconButton>
+              )}
             </>
           )}
           <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
@@ -690,11 +700,26 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
             </TextField>
             <TextField
               label="Contraseña del supervisor *"
-              type="password"
+              type={showSupervisorPassword ? 'text' : 'password'}
               value={supervisorPassword}
               onChange={(event) => setSupervisorPassword(event.target.value)}
               fullWidth
               autoComplete="current-password"
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="toggle password visibility"
+                        onClick={() => setShowSupervisorPassword(!showSupervisorPassword)}
+                        edge="end"
+                      >
+                        {showSupervisorPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }
+              }}
             />
           </Stack>
         </DialogContent>
@@ -721,6 +746,11 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
 
 export function CasesMaintenancePage() {
   const { data: cases, error, loading, refetch } = useApiQuery('cases', fetchCases)
+  const canViewCases = usePermission('view_cases')
+  const canCreateCase = usePermission('create_case')
+  const canEditCase = usePermission('edit_case')
+  const canDeleteCase = usePermission('delete_case')
+  const permissionsLoading = usePermissionLoading()
   const { data: clients } = useApiQuery('clients-for-select', fetchClients)
   const { data: policies } = useApiQuery('policies-for-select', fetchPolicies)
   const { data: users } = useApiQuery('users-for-select', fetchUsers)
@@ -736,8 +766,10 @@ export function CasesMaintenancePage() {
   const [selectedCase, setSelectedCase] = useState<CaseRaw | CaseDetail | null>(null)
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  // Flag to skip the policy-clear effect during programmatic form resets
+  const isResettingRef = useRef(false)
 
-  const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CaseFormData>({
+  const { control, handleSubmit, reset, watch, setValue, getValues, formState: { errors, isSubmitting } } = useForm<CaseFormData>({
     resolver: zodResolver(caseSchema),
     defaultValues: {
       title: '',
@@ -755,6 +787,7 @@ export function CasesMaintenancePage() {
 
   const openCreate = () => {
     setDialogMode('create')
+    isResettingRef.current = true
     reset({
       title: '',
       description: '',
@@ -774,6 +807,7 @@ export function CasesMaintenancePage() {
     setSelectedCase(c)
     setAnchorEl(null)
     setDialogMode('edit')
+    isResettingRef.current = true
     reset({
       title: c.title,
       description: c.description ?? '',
@@ -834,18 +868,56 @@ export function CasesMaintenancePage() {
     { field: 'caseNumber', headerName: 'Nº Caso', width: 140 },
     { field: 'title', headerName: 'Título', flex: 1, minWidth: 200 },
     { field: 'client', headerName: 'Cliente', flex: 1, minWidth: 160, valueGetter: (_v, row: CaseRaw) => row.client?.displayName ?? '—' },
-    { field: 'type', headerName: 'Tipo', width: 160, valueGetter: (_v, row: CaseRaw) => t(caseTypeLabels, row.type) },
     {
-      field: 'priority', headerName: 'Prioridad', width: 130,
+      field: 'type',
+      headerName: 'Tipo',
+      width: 160,
+      type: 'singleSelect',
+      valueOptions: Object.entries(caseTypeLabels).map(([value, label]) => ({ value, label })),
+      valueFormatter: (value) => t(caseTypeLabels, value as string),
+    },
+    {
+      field: 'priority', headerName: 'Prioridad', width: 130, type: 'singleSelect',
+      valueOptions: Object.entries(casePriorityLabels).map(([value, label]) => ({ value, label })),
       renderCell: (params) => <PriorityChip priority={params.row.priority} />,
     },
     {
-      field: 'status', headerName: 'Estado', width: 170,
+      field: 'status', headerName: 'Estado', width: 170, type: 'singleSelect',
+      valueOptions: Object.entries(caseStatusLabels).map(([value, label]) => ({ value, label })),
       renderCell: (params) => <StatusChip status={params.row.status} />,
     },
     {
+      field: 'tags',
+      headerName: 'Etiquetas',
+      width: 200,
+      sortable: false,
+      renderCell: (params) => {
+        const tags: { uuid: string; name: string; color: string }[] = params.row.tags ?? []
+        if (!tags.length) return <span style={{ color: 'var(--mui-palette-text-disabled)' }}>—</span>
+        return (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4, alignItems: 'center', py: 0.5 }}>
+            {tags.map((tag) => (
+              <Chip
+                key={tag.uuid}
+                size="small"
+                label={tag.name}
+                sx={{
+                  height: 20,
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  bgcolor: `${tag.color}28`,
+                  color: tag.color,
+                  border: `1px solid ${tag.color}55`,
+                }}
+              />
+            ))}
+          </Box>
+        )
+      },
+    },
+    ...((canEditCase || canDeleteCase) ? [{
       field: 'actions', headerName: '', width: 60, sortable: false,
-      renderCell: (params) => (
+      renderCell: (params: any) => (
         <IconButton size="small" onClick={(e) => {
           e.stopPropagation()
           setAnchorEl(e.currentTarget)
@@ -854,15 +926,66 @@ export function CasesMaintenancePage() {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ]
 
   const selectedClient = (selectedCase as any)?.client as ClientRaw | null | undefined
   const selectedPolicy = (selectedCase as any)?.policy as PolicyRaw | null | undefined
   const selectedAssignedUser = (selectedCase as any)?.assignedUser as UserRaw | null | undefined
+  const formClientId = watch('clientId')
+
+  const filteredPolicies = useMemo(() => {
+    const list = policies ?? []
+    if (!formClientId) return []
+    return list.filter((p) => p.clientUuid === formClientId || p.client?.uuid === formClientId)
+  }, [policies, formClientId])
+
+  const [policiesLoading, setPoliciesLoading] = useState(false)
+
+  useEffect(() => {
+    if (formClientId) {
+      setPoliciesLoading(true)
+      const timer = setTimeout(() => {
+        setPoliciesLoading(false)
+      }, 400)
+      return () => clearTimeout(timer)
+    } else {
+      setPoliciesLoading(false)
+    }
+  }, [formClientId])
+
+  // Clear policyId only when the CLIENT changes and the current policy no longer belongs to it.
+  // This effect must NOT depend on formPolicyId — otherwise every policy selection re-triggers it.
+  useEffect(() => {
+    if (isResettingRef.current) {
+      isResettingRef.current = false
+      return
+    }
+    const currentPolicyId = getValues('policyId')
+    if (formClientId && currentPolicyId) {
+      const matchingPolicy = policies?.find((p) => p.uuid === currentPolicyId)
+      if (matchingPolicy && matchingPolicy.clientUuid !== formClientId && matchingPolicy.client?.uuid !== formClientId) {
+        setValue('policyId', '')
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formClientId, policies])
+
   const clientOptions = withSelectedOption(clients, selectedClient)
-  const policyOptions = withSelectedOption(policies, selectedPolicy)
+  const policyOptions = withSelectedOption(filteredPolicies, selectedPolicy)
   const userOptions = withSelectedOption(users, selectedAssignedUser)
+
+  if (permissionsLoading) {
+    return <MaintenanceSkeleton layout="table" />
+  }
+
+  if (!canViewCases) {
+    return (
+      <Alert severity="error" sx={{ mt: 4, borderRadius: 2 }}>
+        Acceso denegado. No tiene permisos para ver los casos.
+      </Alert>
+    )
+  }
 
   return (
     <Stack spacing={4} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -870,47 +993,37 @@ export function CasesMaintenancePage() {
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Casos" description="Reclamos, renovaciones, endosos y seguimiento operativo." actionLabel="" icon={ClipboardCheck} />
         </Box>
-        <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-          Nuevo caso
-        </Button>
+        {canCreateCase && (
+          <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
+            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
+            Nuevo caso
+          </Button>
+        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de casos.</Alert>}
 
-      <Box sx={{ height: 600, width: '100%', bgcolor: 'background.paper', borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.05)', border: '1px solid', borderColor: 'divider' }}>
-        <DataGrid
-          rows={cases ?? []}
-          columns={columns}
-          getRowId={(row) => row.uuid}
-          loading={loading}
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[10, 25, 50]}
-          disableRowSelectionOnClick
-          onRowClick={(params) => setDrawerCaseId(params.row.uuid)}
-          localeText={esESGrid}
-          sx={{
-            border: 'none',
-            cursor: 'pointer',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600, color: 'text.secondary' },
-            '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', color: 'text.primary' },
-            '& .MuiDataGrid-row:hover': { bgcolor: 'action.hover' },
-            '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' },
-          }}
-        />
-      </Box>
+      <ResponsiveDataGrid
+        rows={cases ?? []}
+        columns={columns}
+        getRowId={(row) => row.uuid}
+        loading={loading}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        onRowClick={(params) => setDrawerCaseId(params.row.uuid)}
+        localeText={esESGrid}
+        sx={{ cursor: 'pointer', '& .MuiDataGrid-row:hover': { bgcolor: 'action.hover' } }}
+      />
 
       {/* Row context menu */}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
         slotProps={{ paper: { elevation: 0, sx: { borderRadius: 3, minWidth: 140, border: '1px solid', borderColor: 'divider', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } } }}>
-        <MenuItem onClick={() => { if (selectedCase) openEdit(selectedCase) }} sx={{ color: 'text.primary' }}>
+        {canEditCase && <MenuItem onClick={() => { if (selectedCase) openEdit(selectedCase) }} sx={{ color: 'text.primary' }}>
           <Edit2 size={16} className="mr-2" style={{ opacity: 0.7 }} /> Editar
-        </MenuItem>
-        <MenuItem onClick={() => { if (selectedCase) openDelete(selectedCase) }} sx={{ color: 'error.main' }}>
+        </MenuItem>}
+        {canDeleteCase && <MenuItem onClick={() => { if (selectedCase) openDelete(selectedCase) }} sx={{ color: 'error.main' }}>
           <Trash2 size={16} className="mr-2" /> Eliminar
-        </MenuItem>
+        </MenuItem>}
       </Menu>
 
       {/* Case Details Drawer */}
@@ -1020,11 +1133,33 @@ export function CasesMaintenancePage() {
                     value={policyOptions.find((p) => p.uuid === field.value) ?? null}
                     onChange={(_, newValue) => field.onChange(newValue?.uuid ?? '')}
                     isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
-                    noOptionsText="Sin resultados"
+                    noOptionsText={formClientId ? "Sin resultados" : "Selecciona un cliente primero"}
+                    disabled={!formClientId}
+                    loading={policiesLoading}
                     fullWidth
-                    renderInput={(params) => (
-                      <TextField {...params} label="Póliza Asociada" error={!!errors.policyId} helperText={errors.policyId?.message ?? ' '} />
-                    )}
+                    renderInput={(params) => {
+                      const { slotProps, ...restParams } = params
+                      return (
+                        <TextField
+                          {...restParams}
+                          label="Póliza Asociada"
+                          error={!!errors.policyId}
+                          helperText={errors.policyId?.message ?? ' '}
+                          slotProps={{
+                            ...slotProps,
+                            input: {
+                              ...slotProps.input,
+                              endAdornment: (
+                                <>
+                                  {policiesLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                  {slotProps.input.endAdornment}
+                                </>
+                              ),
+                            },
+                          }}
+                        />
+                      )
+                    }}
                   />
                 )} />
               </Stack>
@@ -1041,34 +1176,71 @@ export function CasesMaintenancePage() {
                   renderInput={(params) => (
                     <TextField {...params} label="Responsable Asignado" error={!!errors.assignedUserId} helperText={errors.assignedUserId?.message ?? ' '} />
                   )}
+                  renderOption={(props: React.HTMLAttributes<HTMLLIElement> & { key: React.Key }, option: UserRaw) => {
+                    const { key, ...optionProps } = props;
+                    const initials = `${option.firstName?.[0] ?? ''}${option.lastName?.[0] ?? ''}`.toUpperCase()
+                    return (
+                      <li key={key} {...optionProps}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem', fontWeight: 600, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
+                            {initials}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                              {option.firstName} {option.lastName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.email}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </li>
+                    );
+                  }}
                 />
               )} />
 
               <Controller name="tagUuids" control={control} render={({ field }) => (
-                <FormControl fullWidth error={!!errors.tagUuids}>
-                  <InputLabel id="tags-select-label">Etiquetas</InputLabel>
-                  <Select
-                    {...field}
-                    labelId="tags-select-label"
-                    multiple
-                    input={<OutlinedInput label="Etiquetas" />}
-                    renderValue={(selectedUuids) => (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {(selectedUuids as string[]).map((uuid) => {
-                          const tag = (tags ?? []).find((t: TagRaw) => t.uuid === uuid)
-                          return <Chip key={uuid} label={tag?.name ?? uuid} size="small" sx={{ bgcolor: tag?.color ?? 'grey.300', color: '#fff' }} />
-                        })}
-                      </Box>
-                    )}
-                  >
-                    {(tags ?? []).map((t: TagRaw) => (
-                      <MenuItem key={t.uuid} value={t.uuid}>
-                        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: t.color, mr: 1 }} />
-                        {t.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  multiple
+                  options={tags ?? []}
+                  getOptionLabel={(option: TagRaw) => option.name}
+                  value={(tags ?? []).filter((t) => (field.value ?? []).includes(t.uuid))}
+                  onChange={(_, newValue) => {
+                    field.onChange(newValue.map((v) => v.uuid))
+                  }}
+                  isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
+                  noOptionsText="Sin resultados"
+                  fullWidth
+                  renderInput={(params) => (
+                    <TextField {...params} label="Etiquetas" error={!!errors.tagUuids} helperText={errors.tagUuids?.message ?? ' '} />
+                  )}
+                  renderValue={(tagValue: TagRaw[], getItemProps: any) =>
+                    tagValue.map((option: TagRaw, index: number) => {
+                      const { key, ...tagProps } = getItemProps({ index });
+                      return (
+                        <Chip
+                          key={key}
+                          label={option.name}
+                          size="small"
+                          sx={{ bgcolor: option.color ?? 'grey.300', color: '#fff', fontWeight: 600 }}
+                          {...tagProps}
+                        />
+                      );
+                    })
+                  }
+                  renderOption={(props: React.HTMLAttributes<HTMLLIElement> & { key: React.Key }, option: TagRaw) => {
+                    const { key, ...optionProps } = props;
+                    return (
+                      <li key={key} {...optionProps}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: option.color }} />
+                          <span>{option.name}</span>
+                        </Box>
+                      </li>
+                    );
+                  }}
+                />
               )} />
             </Stack>
           </DialogContent>

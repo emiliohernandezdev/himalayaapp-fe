@@ -1,5 +1,8 @@
 import { alpha, createTheme } from '@mui/material/styles'
 import type { PaletteMode } from '@mui/material/styles'
+import { esES as materialEsES } from '@mui/material/locale'
+import { esES as dataGridEsES } from '@mui/x-data-grid/locales'
+import { esES as datePickersEsES } from '@mui/x-date-pickers/locales'
 
 export const himalayaPalette = {
   light: {
@@ -44,129 +47,134 @@ export function createHimalayaTheme(mode: PaletteMode) {
   const palette = himalayaPalette[mode]
   const isLight = mode === 'light'
 
-  return createTheme({
-    palette: {
-      mode,
-      primary: {
-        main: palette.primary,
-        light: palette.primaryLight,
-        dark: palette.primaryDark,
-        contrastText: isLight ? '#ffffff' : '#052033',
-      },
-      secondary: {
-        main: palette.secondary,
-        light: isLight ? '#7dd3fc' : '#93c5fd',
-        dark: isLight ? '#075985' : '#2563eb',
-        contrastText: isLight ? '#ffffff' : '#06111f',
-      },
-      success: {
-        main: palette.success,
-        contrastText: isLight ? '#ffffff' : '#06281d',
-      },
-      warning: {
-        main: palette.warning,
-        contrastText: isLight ? '#ffffff' : '#251a02',
-      },
-      error: {
-        main: palette.error,
-        contrastText: '#ffffff',
-      },
-      background: {
-        default: palette.background,
-        paper: palette.surface,
-      },
-      text: {
-        primary: palette.text,
-        secondary: palette.textMuted,
-      },
-      divider: palette.border,
-      action: {
-        hover: palette.actionHover,
-        selected: alpha(palette.primary, isLight ? 0.12 : 0.2),
-        disabled: alpha(palette.textMuted, 0.45),
-        disabledBackground: alpha(palette.textMuted, 0.16),
-      },
-    },
-    typography: {
-      fontFamily: '"Plus Jakarta Sans", sans-serif',
-      h1: {
-        fontWeight: 800,
-        letterSpacing: 0,
-      },
-      h2: {
-        fontWeight: 800,
-        letterSpacing: 0,
-      },
-      h3: {
-        fontWeight: 800,
-        letterSpacing: 0,
-      },
-      h4: {
-        fontWeight: 750,
-        letterSpacing: 0,
-      },
-      h5: {
-        fontWeight: 750,
-        letterSpacing: 0,
-      },
-      h6: {
-        fontWeight: 750,
-        letterSpacing: 0,
-      },
-      subtitle1: {
-        fontWeight: 700,
-      },
-      button: {
-        fontWeight: 750,
-        textTransform: 'none',
-      },
-    },
-    shape: {
-      borderRadius: 8,
-    },
-    components: {
-      MuiButton: {
-        defaultProps: {
-          disableElevation: true,
+  return createTheme(
+    {
+      palette: {
+        mode,
+        primary: {
+          main: palette.primary,
+          light: palette.primaryLight,
+          dark: palette.primaryDark,
+          contrastText: isLight ? '#ffffff' : '#052033',
         },
-        styleOverrides: {
-          root: {
-            minHeight: 40,
-            borderRadius: 8,
+        secondary: {
+          main: palette.secondary,
+          light: isLight ? '#7dd3fc' : '#93c5fd',
+          dark: isLight ? '#075985' : '#2563eb',
+          contrastText: isLight ? '#ffffff' : '#06111f',
+        },
+        success: {
+          main: palette.success,
+          contrastText: isLight ? '#ffffff' : '#06281d',
+        },
+        warning: {
+          main: palette.warning,
+          contrastText: isLight ? '#ffffff' : '#251a02',
+        },
+        error: {
+          main: palette.error,
+          contrastText: '#ffffff',
+        },
+        background: {
+          default: palette.background,
+          paper: palette.surface,
+        },
+        text: {
+          primary: palette.text,
+          secondary: palette.textMuted,
+        },
+        divider: palette.border,
+        action: {
+          hover: palette.actionHover,
+          selected: alpha(palette.primary, isLight ? 0.12 : 0.2),
+          disabled: alpha(palette.textMuted, 0.45),
+          disabledBackground: alpha(palette.textMuted, 0.16),
+        },
+      },
+      typography: {
+        fontFamily: '"Plus Jakarta Sans", sans-serif',
+        h1: {
+          fontWeight: 800,
+          letterSpacing: 0,
+        },
+        h2: {
+          fontWeight: 800,
+          letterSpacing: 0,
+        },
+        h3: {
+          fontWeight: 800,
+          letterSpacing: 0,
+        },
+        h4: {
+          fontWeight: 750,
+          letterSpacing: 0,
+        },
+        h5: {
+          fontWeight: 750,
+          letterSpacing: 0,
+        },
+        h6: {
+          fontWeight: 750,
+          letterSpacing: 0,
+        },
+        subtitle1: {
+          fontWeight: 700,
+        },
+        button: {
+          fontWeight: 750,
+          textTransform: 'none',
+        },
+      },
+      shape: {
+        borderRadius: 8,
+      },
+      components: {
+        MuiButton: {
+          defaultProps: {
+            disableElevation: true,
+          },
+          styleOverrides: {
+            root: {
+              minHeight: 40,
+              borderRadius: 8,
+            },
+          },
+        },
+        MuiCard: {
+          styleOverrides: {
+            root: {
+              backgroundImage: 'none',
+              border: `1px solid ${palette.border}`,
+              boxShadow: isLight
+                ? '0 10px 30px rgba(15, 23, 42, 0.06)'
+                : '0 10px 30px rgba(0, 0, 0, 0.28)',
+            },
+          },
+        },
+        MuiChip: {
+          styleOverrides: {
+            root: {
+              borderRadius: 8,
+              fontWeight: 700,
+            },
+          },
+        },
+        MuiPaper: {
+          styleOverrides: {
+            root: {
+              backgroundImage: 'none',
+            },
+          },
+        },
+        MuiTextField: {
+          defaultProps: {
+            variant: 'outlined',
           },
         },
       },
-      MuiCard: {
-        styleOverrides: {
-          root: {
-            backgroundImage: 'none',
-            border: `1px solid ${palette.border}`,
-            boxShadow: isLight
-              ? '0 10px 30px rgba(15, 23, 42, 0.06)'
-              : '0 10px 30px rgba(0, 0, 0, 0.28)',
-          },
-        },
-      },
-      MuiChip: {
-        styleOverrides: {
-          root: {
-            borderRadius: 8,
-            fontWeight: 700,
-          },
-        },
-      },
-      MuiPaper: {
-        styleOverrides: {
-          root: {
-            backgroundImage: 'none',
-          },
-        },
-      },
-      MuiTextField: {
-        defaultProps: {
-          variant: 'outlined',
-        },
-      },
     },
-  })
+    materialEsES,
+    dataGridEsES,
+    datePickersEsES,
+  )
 }
