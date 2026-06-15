@@ -10,6 +10,21 @@ import type { TagRaw } from '../../api/maintenanceApi'
 import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
 
+const colorPresets = [
+  '#075985',
+  '#2563eb',
+  '#7c3aed',
+  '#db2777',
+  '#dc2626',
+  '#ea580c',
+  '#ca8a04',
+  '#16a34a',
+  '#0891b2',
+  '#475569',
+  '#111827',
+  '#64748b',
+]
+
 const tagSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Debe ser un color hexadecimal válido (#RRGGBB)'),
@@ -157,9 +172,57 @@ export function TagsMaintenancePage() {
                 <TextField {...field} label="Nombre" fullWidth required error={!!errors.name} helperText={errors.name?.message} />
               )} />
               <Controller name="color" control={control} render={({ field }) => (
-                <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                  <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: field.value, border: '1px solid', borderColor: 'divider', flexShrink: 0 }} />
-                  <TextField {...field} label="Color (hex)" fullWidth error={!!errors.color} helperText={errors.color?.message} placeholder="#075985" />
+                <Stack spacing={1.5}>
+                  <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                    <Box
+                      component="input"
+                      type="color"
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      aria-label="Color de etiqueta"
+                      sx={{
+                        width: 56,
+                        height: 48,
+                        p: 0.5,
+                        bgcolor: 'transparent',
+                        border: '1px solid',
+                        borderColor: errors.color ? 'error.main' : 'divider',
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="caption" sx={{ color: errors.color ? 'error.main' : 'text.secondary', display: 'block', mb: 0.75 }}>
+                        Color
+                      </Typography>
+                      <Box sx={{ height: 32, borderRadius: 2, bgcolor: field.value, border: '1px solid', borderColor: 'divider' }} />
+                      {errors.color?.message && (
+                        <Typography variant="caption" sx={{ color: 'error.main', display: 'block', mt: 0.5 }}>
+                          {errors.color.message}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Stack>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1 }}>
+                    {colorPresets.map((color) => (
+                      <IconButton
+                        key={color}
+                        type="button"
+                        onClick={() => field.onChange(color)}
+                        aria-label={`Seleccionar color ${color}`}
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 2,
+                          bgcolor: color,
+                          border: '2px solid',
+                          borderColor: field.value.toLowerCase() === color.toLowerCase() ? 'text.primary' : 'transparent',
+                          '&:hover': { bgcolor: color, opacity: 0.88 },
+                        }}
+                      />
+                    ))}
+                  </Box>
                 </Stack>
               )} />
               <Controller name="description" control={control} render={({ field }) => (

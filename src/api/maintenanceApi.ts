@@ -1,4 +1,6 @@
 import { graphqlRequest } from './graphqlClient'
+import { graphqlOperationIds } from './graphqlOperationIds'
+import type { NodeAccess } from '../store/useAuthStore'
 
 export type MaintenanceModuleDto = {
   uuid: string
@@ -23,23 +25,8 @@ type MaintenanceModulesResponse = {
   maintenanceModules: MaintenanceModuleDto[]
 }
 
-const maintenanceModulesQuery = `
-  query MaintenanceModules {
-    maintenanceModules {
-      uuid
-      slug
-      title
-      description
-      route
-      icon
-      tone
-      sortOrder
-    }
-  }
-`
-
 export function fetchMaintenanceModules() {
-  return graphqlRequest<MaintenanceModulesResponse>(maintenanceModulesQuery).then((data) => data.maintenanceModules)
+  return graphqlRequest<MaintenanceModulesResponse>(graphqlOperationIds.maintenanceModules).then((data) => data.maintenanceModules)
 }
 
 // ─── Providers ──────────────────────────────────────────
@@ -58,32 +45,26 @@ export type ProviderRaw = {
 }
 
 export function fetchProviders() {
-  return graphqlRequest<{ providers: ProviderRaw[] }>(`
-    query Providers {
-      providers {
-        uuid name type status contactName contactEmail contactPhone logo address taxId
-      }
-    }
-  `).then((data) => data.providers)
+  return graphqlRequest<{ providers: ProviderRaw[] }>(graphqlOperationIds.providers).then((data) => data.providers)
 }
 
 export function createProvider(input: Record<string, unknown>) {
   return graphqlRequest<{ createProvider: { uuid: string } }>(
-    `mutation CreateProvider($input: CreateProviderInput!) { createProvider(input: $input) { uuid } }`,
+    graphqlOperationIds.createProvider,
     { input }
   )
 }
 
 export function updateProvider(input: Record<string, unknown>) {
   return graphqlRequest<{ updateProvider: { uuid: string } }>(
-    `mutation UpdateProvider($input: UpdateProviderInput!) { updateProvider(input: $input) { uuid } }`,
+    graphqlOperationIds.updateProvider,
     { input }
   )
 }
 
 export function removeProvider(uuid: string) {
   return graphqlRequest<{ removeProvider: boolean }>(
-    `mutation RemoveProvider($uuid: String!) { removeProvider(uuid: $uuid) }`,
+    graphqlOperationIds.removeProvider,
     { uuid }
   )
 }
@@ -102,33 +83,28 @@ export type ProductRaw = {
 }
 
 export function fetchProducts() {
-  return graphqlRequest<{ products: ProductRaw[] }>(`
-    query Products {
-      products {
-        uuid name category status lineOfBusiness description providerUuid
-        provider { uuid name }
-      }
-    }
-  `).then((data) => data.products)
+  return graphqlRequest<{ products: ProductRaw[] }>(graphqlOperationIds.products).then((data) => data.products)
 }
 
 export function createProduct(input: Record<string, unknown>) {
+  const { providerUuid, ...rest } = input
   return graphqlRequest<{ createProduct: { uuid: string } }>(
-    `mutation CreateProduct($input: CreateProductInput!) { createProduct(input: $input) { uuid } }`,
-    { input }
+    graphqlOperationIds.createProduct,
+    { input: { ...rest, providerId: providerUuid } }
   )
 }
 
 export function updateProduct(input: Record<string, unknown>) {
+  const { providerUuid, ...rest } = input
   return graphqlRequest<{ updateProduct: { uuid: string } }>(
-    `mutation UpdateProduct($input: UpdateProductInput!) { updateProduct(input: $input) { uuid } }`,
-    { input }
+    graphqlOperationIds.updateProduct,
+    { input: { ...rest, providerId: providerUuid } }
   )
 }
 
 export function removeProduct(uuid: string) {
   return graphqlRequest<{ removeProduct: boolean }>(
-    `mutation RemoveProduct($uuid: String!) { removeProduct(uuid: $uuid) }`,
+    graphqlOperationIds.removeProduct,
     { uuid }
   )
 }
@@ -149,32 +125,26 @@ export type ClientRaw = {
 }
 
 export function fetchClients() {
-  return graphqlRequest<{ clients: ClientRaw[] }>(`
-    query Clients {
-      clients {
-        uuid displayName type status taxId email phone address city department
-      }
-    }
-  `).then((data) => data.clients)
+  return graphqlRequest<{ clients: ClientRaw[] }>(graphqlOperationIds.clients).then((data) => data.clients)
 }
 
 export function createClient(input: Record<string, unknown>) {
   return graphqlRequest<{ createClient: { uuid: string } }>(
-    `mutation CreateClient($input: CreateClientInput!) { createClient(input: $input) { uuid } }`,
+    graphqlOperationIds.createClient,
     { input }
   )
 }
 
 export function updateClient(input: Record<string, unknown>) {
   return graphqlRequest<{ updateClient: { uuid: string } }>(
-    `mutation UpdateClient($input: UpdateClientInput!) { updateClient(input: $input) { uuid } }`,
+    graphqlOperationIds.updateClient,
     { input }
   )
 }
 
 export function removeClient(uuid: string) {
   return graphqlRequest<{ removeClient: boolean }>(
-    `mutation RemoveClient($uuid: String!) { removeClient(uuid: $uuid) }`,
+    graphqlOperationIds.removeClient,
     { uuid }
   )
 }
@@ -200,17 +170,7 @@ export type PolicyRaw = {
 }
 
 export function fetchPolicies() {
-  return graphqlRequest<{ policies: PolicyRaw[] }>(`
-    query Policies {
-      policies {
-        uuid policyNumber status startDate endDate premiumAmount insuredAmount currency notes
-        clientUuid providerUuid productUuid
-        client { uuid displayName }
-        provider { uuid name }
-        product { uuid name }
-      }
-    }
-  `).then((data) => data.policies)
+  return graphqlRequest<{ policies: PolicyRaw[] }>(graphqlOperationIds.policies).then((data) => data.policies)
 }
 
 // ─── Cases ──────────────────────────────────────────────
@@ -225,18 +185,15 @@ export type CaseRaw = {
   description?: string | null
   clientUuid: string
   client: { uuid: string; displayName: string }
+  policyUuid?: string | null
+  policy?: { uuid: string; policyNumber: string } | null
+  assignedUserUuid?: string | null
+  assignedUser?: { uuid: string; firstName: string; lastName: string; email: string } | null
+  tags?: { uuid: string; name: string; color: string }[]
 }
 
 export function fetchCases() {
-  return graphqlRequest<{ cases: CaseRaw[] }>(`
-    query Cases {
-      cases {
-        uuid caseNumber title status priority type description
-        clientUuid
-        client { uuid displayName }
-      }
-    }
-  `).then((data) => data.cases)
+  return graphqlRequest<{ cases: CaseRaw[] }>(graphqlOperationIds.cases).then((data) => data.cases)
 }
 
 // ─── Tags ───────────────────────────────────────────────
@@ -249,30 +206,26 @@ export type TagRaw = {
 }
 
 export function fetchTags() {
-  return graphqlRequest<{ tags: TagRaw[] }>(`
-    query Tags {
-      tags { uuid name color description }
-    }
-  `).then((data) => data.tags)
+  return graphqlRequest<{ tags: TagRaw[] }>(graphqlOperationIds.tags).then((data) => data.tags)
 }
 
 export function createTag(input: Record<string, unknown>) {
   return graphqlRequest<{ createTag: { uuid: string } }>(
-    `mutation CreateTag($input: CreateTagInput!) { createTag(input: $input) { uuid } }`,
+    graphqlOperationIds.createTag,
     { input }
   )
 }
 
 export function updateTag(input: Record<string, unknown>) {
   return graphqlRequest<{ updateTag: { uuid: string } }>(
-    `mutation UpdateTag($input: UpdateTagInput!) { updateTag(input: $input) { uuid } }`,
+    graphqlOperationIds.updateTag,
     { input }
   )
 }
 
 export function removeTag(uuid: string) {
   return graphqlRequest<{ removeTag: boolean }>(
-    `mutation RemoveTag($uuid: String!) { removeTag(uuid: $uuid) }`,
+    graphqlOperationIds.removeTag,
     { uuid }
   )
 }
@@ -316,78 +269,46 @@ export type CaseDetail = {
 
 export function fetchCaseDetail(uuid: string): Promise<CaseDetail> {
   return graphqlRequest<{ case: CaseDetail }>(
-    `query CaseDetail($uuid: String!) {
-      case(uuid: $uuid) {
-        uuid caseNumber title description type status priority dueAt closedAt createdAt updatedAt clientUuid
-        client { uuid displayName email phone }
-        policy { uuid policyNumber }
-        assignedUser { uuid firstName lastName email }
-        tags { uuid name color }
-        comments {
-          uuid body internalOnly createdAt
-          author { uuid firstName lastName email }
-        }
-        auditLogs {
-          uuid action entityName before after createdAt
-          actor { uuid firstName lastName }
-        }
-      }
-    }`,
+    graphqlOperationIds.caseDetail,
     { uuid }
   ).then((data) => data.case)
 }
 
 // ─── Authentication ─────────────────────────────────────
 
-export function loginApi(email: string, password: string) {
-  return graphqlRequest<{ login: { accessToken: string; user: any } }>(
-    `mutation Login($email: String!, $password: String!) {
-      login(email: $email, password: $password) {
-        accessToken
-        user {
-          uuid
-          email
-          firstName
-          lastName
-          roles
-        }
-      }
-    }`,
-    { email, password }
+export function loginApi(email: string, password: string, instanceUuid?: string) {
+  return graphqlRequest<{ login: { accessToken: string | null; user: any; accessNodes: NodeAccess[]; requiresModuleSelection: boolean } }>(
+    graphqlOperationIds.login,
+    { email, password, instanceUuid }
   ).then((data) => data.login)
+}
+
+export function verifySupervisorAuthorizationApi(email: string, password: string) {
+  return graphqlRequest<{ verifySupervisorAuthorization: { authorized: boolean; supervisor: any } }>(
+    graphqlOperationIds.verifySupervisorAuthorization,
+    { email, password }
+  ).then((data) => data.verifySupervisorAuthorization)
 }
 
 // ─── Policies CRUD ──────────────────────────────────────
 
 export function createPolicy(input: any) {
   return graphqlRequest<{ createPolicy: any }>(
-    `mutation CreatePolicy($input: CreatePolicyInput!) {
-      createPolicy(input: $input) {
-        uuid
-        policyNumber
-      }
-    }`,
+    graphqlOperationIds.createPolicy,
     { input }
   ).then((data) => data.createPolicy)
 }
 
 export function updatePolicy(input: any) {
   return graphqlRequest<{ updatePolicy: any }>(
-    `mutation UpdatePolicy($input: UpdatePolicyInput!) {
-      updatePolicy(input: $input) {
-        uuid
-        policyNumber
-      }
-    }`,
+    graphqlOperationIds.updatePolicy,
     { input }
   ).then((data) => data.updatePolicy)
 }
 
 export function removePolicy(uuid: string) {
   return graphqlRequest<{ removePolicy: boolean }>(
-    `mutation RemovePolicy($uuid: String!) {
-      removePolicy(uuid: $uuid)
-    }`,
+    graphqlOperationIds.removePolicy,
     { uuid }
   ).then((data) => data.removePolicy)
 }
@@ -396,53 +317,28 @@ export function removePolicy(uuid: string) {
 
 export function createCase(input: any) {
   return graphqlRequest<{ createCase: any }>(
-    `mutation CreateCase($input: CreateCaseInput!) {
-      createCase(input: $input) {
-        uuid
-        caseNumber
-      }
-    }`,
+    graphqlOperationIds.createCase,
     { input }
   ).then((data) => data.createCase)
 }
 
 export function updateCase(input: any) {
   return graphqlRequest<{ updateCase: any }>(
-    `mutation UpdateCase($input: UpdateCaseInput!) {
-      updateCase(input: $input) {
-        uuid
-        caseNumber
-      }
-    }`,
+    graphqlOperationIds.updateCase,
     { input }
   ).then((data) => data.updateCase)
 }
 
 export function removeCase(uuid: string) {
   return graphqlRequest<{ removeCase: boolean }>(
-    `mutation RemoveCase($uuid: String!) {
-      removeCase(uuid: $uuid)
-    }`,
+    graphqlOperationIds.removeCase,
     { uuid }
   ).then((data) => data.removeCase)
 }
 
 export function addCommentApi(caseId: string, body: string, internalOnly: boolean) {
   return graphqlRequest<{ addComment: any }>(
-    `mutation AddComment($caseId: String!, $body: String!, $internalOnly: Boolean!) {
-      addComment(caseId: $caseId, body: $body, internalOnly: $internalOnly) {
-        uuid
-        body
-        internalOnly
-        createdAt
-        author {
-          uuid
-          firstName
-          lastName
-          email
-        }
-      }
-    }`,
+    graphqlOperationIds.addComment,
     { caseId, body, internalOnly }
   ).then((data) => data.addComment)
 }
@@ -456,11 +352,5 @@ export type UserRaw = {
 }
 
 export function fetchUsers() {
-  return graphqlRequest<{ users: UserRaw[] }>(`
-    query Users {
-      users {
-        uuid firstName lastName email roles
-      }
-    }
-  `).then((data) => data.users)
+  return graphqlRequest<{ users: UserRaw[] }>(graphqlOperationIds.users).then((data) => data.users)
 }

@@ -1,29 +1,46 @@
-import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Stack, TextField, Typography, InputAdornment, IconButton } from '@mui/material'
+import {
+  Box,
+  Button,
+  Checkbox,
+  CircularProgress,
+  FormControl,
+  FormControlLabel,
+  IconButton,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
 import type { PaletteMode } from '@mui/material/styles'
-import { ArrowRight, CheckCircle2, LockKeyhole, ShieldCheck, Eye, EyeOff } from 'lucide-react'
-import { useNavigate } from 'react-router'
-import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
+import { ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
+import { Controller, useForm, useWatch } from 'react-hook-form'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { HimalayaLogo } from '../components/HimalayaLogo'
+import * as z from 'zod'
 import { loginApi } from '../api/maintenanceApi'
+import { HimalayaLogo } from '../components/HimalayaLogo'
 import { useAuthStore } from '../store/useAuthStore'
+import type { NodeAccess } from '../store/useAuthStore'
 
 type LoginPageProps = {
   mode: PaletteMode
 }
 
 const loginSchema = z.object({
-  email: z.string().email('Ingresa un correo electrónico válido').min(1, 'El correo es requerido'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  email: z.string().email('Ingresa un correo electronico valido').min(1, 'El correo es requerido'),
+  password: z.string().min(6, 'La contrasena debe tener al menos 6 caracteres'),
+  instanceUuid: z.string().optional(),
 })
 
 type LoginFormData = z.infer<typeof loginSchema>
 
 const accessHighlights = [
-  'Cartera, pólizas y renovaciones en una sola vista',
+  'Cartera, polizas y renovaciones en una sola vista',
   'Seguimientos con responsables, notas y comentarios',
   'Mantenimientos para clientes, proveedores y productos',
 ]
@@ -32,23 +49,45 @@ export function LoginPage({ mode }: LoginPageProps) {
   const navigate = useNavigate()
   const loginStore = useAuthStore((state) => state.login)
   const [showPassword, setShowPassword] = useState(false)
+  const [accessNodes, setAccessNodes] = useState<NodeAccess[]>([])
 
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: '',
       password: '',
+      instanceUuid: '',
     },
   })
 
+  const selectedInstanceUuid = useWatch({ control, name: 'instanceUuid' })
+  const instanceOptions = accessNodes.flatMap((node) =>
+    node.modules.map((module) => ({
+      ...module,
+      label: `${node.title} / ${module.nickname || module.title}`,
+    })),
+  )
+
   const onSubmit = async (data: LoginFormData) => {
     try {
-      const response = await loginApi(data.email, data.password)
-      loginStore(response.accessToken, response.user)
+      const response = await loginApi(data.email, data.password, data.instanceUuid || undefined)
+
+      if (response.requiresModuleSelection || !response.accessToken) {
+        setAccessNodes(response.accessNodes)
+        toast.info('Selecciona el modulo para continuar.')
+        return
+      }
+
+      const selectedModule = response.accessNodes
+        .flatMap((node) => node.modules)
+        .find((module) => module.instanceUuid === data.instanceUuid)
+        ?? response.accessNodes[0]?.modules[0]
+
+      loginStore(response.accessToken, response.user, response.accessNodes, selectedModule?.instanceUuid)
       toast.success(`Bienvenido de nuevo, ${response.user.firstName}!`)
-      navigate('/dashboard')
+      navigate(selectedModule?.route ?? '/dashboard')
     } catch (err: any) {
-      toast.error(err.message || 'Error al iniciar sesión. Verifica tus credenciales.')
+      toast.error(err.message || 'No se pudo iniciar sesion.')
     }
   }
 
@@ -66,7 +105,7 @@ export function LoginPage({ mode }: LoginPageProps) {
                 <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' }, fontWeight: 750 }}>
                   Himalaya
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                <Typography variant="body2" color="text.secondary">
                   Seguros y fianzas
                 </Typography>
               </Box>
@@ -76,8 +115,8 @@ export function LoginPage({ mode }: LoginPageProps) {
               <Typography variant="h2" component="h1" sx={{ fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' }, fontWeight: 800, lineHeight: 1.2 }}>
                 Acceso administrativo
               </Typography>
-              <Typography className="mt-4" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                Panel interno para gestionar clientes, proveedores, productos, pólizas,
+              <Typography className="mt-4" color="text.secondary">
+                Panel interno para gestionar clientes, proveedores, productos, polizas,
                 renovaciones y tareas de seguimiento del equipo.
               </Typography>
             </Box>
@@ -93,7 +132,7 @@ export function LoginPage({ mode }: LoginPageProps) {
                 sx={{ alignItems: 'center' }}
               >
                 <CheckCircle2 size={18} color="var(--himalaya-primary)" />
-                <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>{item}</Typography>
+                <Typography variant="body2">{item}</Typography>
               </Stack>
             ))}
           </Box>
@@ -108,14 +147,14 @@ export function LoginPage({ mode }: LoginPageProps) {
                     <Box className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--himalaya-primary-soft)]">
                       <ShieldCheck size={20} color="var(--himalaya-primary)" />
                     </Box>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                    <Typography variant="overline" color="text.secondary">
                       Acceso Seguro
                     </Typography>
                   </Stack>
                   <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 750 }}>
-                    Iniciar sesión
+                    Iniciar sesion
                   </Typography>
-                  <Typography color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                  <Typography color="text.secondary">
                     Ingresa tus credenciales del sistema para continuar.
                   </Typography>
                 </Stack>
@@ -127,7 +166,7 @@ export function LoginPage({ mode }: LoginPageProps) {
                     render={({ field }) => (
                       <TextField
                         {...field}
-                        label="Correo electrónico *"
+                        label="Correo electronico *"
                         type="email"
                         fullWidth
                         autoComplete="email"
@@ -142,7 +181,7 @@ export function LoginPage({ mode }: LoginPageProps) {
                     render={({ field }) => (
                       <TextField
                         {...field}
-                        label="Contraseña *"
+                        label="Contrasena *"
                         type={showPassword ? 'text' : 'password'}
                         fullWidth
                         autoComplete="current-password"
@@ -153,7 +192,7 @@ export function LoginPage({ mode }: LoginPageProps) {
                             endAdornment: (
                               <InputAdornment position="end">
                                 <IconButton
-                                  aria-label="mostrar u ocultar contraseña"
+                                  aria-label="mostrar u ocultar contrasena"
                                   onClick={() => setShowPassword(!showPassword)}
                                   edge="end"
                                 >
@@ -166,14 +205,25 @@ export function LoginPage({ mode }: LoginPageProps) {
                       />
                     )}
                   />
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    sx={{
-                      alignItems: { xs: 'flex-start', sm: 'center' },
-                      gap: 1,
-                      justifyContent: 'space-between',
-                    }}
-                  >
+                  {instanceOptions.length > 1 ? (
+                    <Controller
+                      name="instanceUuid"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControl fullWidth>
+                          <InputLabel id="module-instance-label">Modulo *</InputLabel>
+                          <Select {...field} labelId="module-instance-label" label="Modulo *">
+                            {instanceOptions.map((module) => (
+                              <MenuItem key={module.instanceUuid} value={module.instanceUuid}>
+                                {module.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      )}
+                    />
+                  ) : null}
+                  <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1, justifyContent: 'space-between' }}>
                     <FormControlLabel control={<Checkbox />} label="Recordar acceso" />
                     <Button variant="text">Recuperar clave</Button>
                   </Stack>
@@ -181,11 +231,11 @@ export function LoginPage({ mode }: LoginPageProps) {
                     type="submit"
                     variant="contained"
                     size="large"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || (instanceOptions.length > 1 && !selectedInstanceUuid)}
                     endIcon={isSubmitting ? undefined : <ArrowRight size={18} />}
                     startIcon={isSubmitting ? <CircularProgress size={18} color="inherit" /> : <LockKeyhole size={18} />}
                   >
-                    {isSubmitting ? 'Iniciando sesión…' : 'Entrar al sistema'}
+                    {isSubmitting ? 'Iniciando sesion...' : instanceOptions.length > 1 ? 'Entrar al modulo' : 'Entrar al sistema'}
                   </Button>
                 </Stack>
               </Stack>

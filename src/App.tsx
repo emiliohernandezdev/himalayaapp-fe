@@ -16,6 +16,7 @@ import { TagsMaintenancePage } from './pages/maintenance/TagsMaintenancePage'
 import { PoliciesPage } from './pages/PoliciesPage'
 import { TasksPage } from './pages/TasksPage'
 import { UsersPage } from './pages/UsersPage'
+import { SecurityDashboardPage } from './pages/security/SecurityDashboardPage'
 import { createHimalayaTheme } from './theme/himalayaTheme'
 import { useThemeModeStore } from './store/useThemeModeStore'
 
@@ -31,7 +32,9 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage mode={mode} />} />
+            <Route path="/select-module" element={<Navigate to="/login" replace />} />
             <Route element={<AppShell mode={mode} onToggleMode={toggleMode} />}>
+              <Route path="/security" element={<SecurityDashboardPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/users" element={<UsersPage />} />

@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, TextField, Typography } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import type { GridColDef } from '@mui/x-data-grid'
 import { Edit2, FileText, MoreVertical, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
@@ -46,7 +46,7 @@ export function PoliciesMaintenancePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PolicyFormData>({
+  const { control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<PolicyFormData>({
     resolver: zodResolver(policySchema),
     defaultValues: {
       policyNumber: '',
@@ -176,6 +176,22 @@ export function PoliciesMaintenancePage() {
     },
   ]
 
+  const selectedProviderUuid = watch('providerUuid')
+  const selectedProductUuid = watch('productUuid')
+
+  const productOptions = useMemo(
+    () => (products ?? []).filter((product) => !selectedProviderUuid || product.providerUuid === selectedProviderUuid),
+    [products, selectedProviderUuid],
+  )
+
+  useEffect(() => {
+    if (!selectedProductUuid) return
+    const selectedProduct = (products ?? []).find((product) => product.uuid === selectedProductUuid)
+    if (selectedProduct && selectedProviderUuid && selectedProduct.providerUuid !== selectedProviderUuid) {
+      setValue('productUuid', '', { shouldValidate: true })
+    }
+  }, [products, selectedProductUuid, selectedProviderUuid, setValue])
+
   return (
     <Stack spacing={4} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }} className="flex-wrap gap-4">
@@ -247,31 +263,53 @@ export function PoliciesMaintenancePage() {
 
               <Stack direction="row" spacing={2}>
                 <Controller name="clientUuid" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Cliente *" fullWidth error={!!errors.clientUuid} helperText={errors.clientUuid?.message ?? ' '}>
-                    <MenuItem value="" disabled>Selecciona un cliente</MenuItem>
-                    {(clients ?? []).map((c: ClientRaw) => (
-                      <MenuItem key={c.uuid} value={c.uuid}>{c.displayName}</MenuItem>
-                    ))}
-                  </TextField>
+                  <Autocomplete
+                    options={clients ?? []}
+                    getOptionLabel={(option: ClientRaw) => option.displayName}
+                    value={(clients ?? []).find((client) => client.uuid === field.value) ?? null}
+                    onChange={(_, newValue) => field.onChange(newValue?.uuid ?? '')}
+                    isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
+                    noOptionsText="Sin resultados"
+                    fullWidth
+                    renderInput={(params) => (
+                      <TextField {...params} label="Cliente *" error={!!errors.clientUuid} helperText={errors.clientUuid?.message ?? ' '} />
+                    )}
+                  />
                 )} />
                 <Controller name="providerUuid" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Proveedor *" fullWidth error={!!errors.providerUuid} helperText={errors.providerUuid?.message ?? ' '}>
-                    <MenuItem value="" disabled>Selecciona un proveedor</MenuItem>
-                    {(providers ?? []).map((p: ProviderRaw) => (
-                      <MenuItem key={p.uuid} value={p.uuid}>{p.name}</MenuItem>
-                    ))}
-                  </TextField>
+                  <Autocomplete
+                    options={providers ?? []}
+                    getOptionLabel={(option: ProviderRaw) => option.name}
+                    value={(providers ?? []).find((provider) => provider.uuid === field.value) ?? null}
+                    onChange={(_, newValue) => {
+                      field.onChange(newValue?.uuid ?? '')
+                      setValue('productUuid', '', { shouldValidate: true })
+                    }}
+                    isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
+                    noOptionsText="Sin resultados"
+                    fullWidth
+                    renderInput={(params) => (
+                      <TextField {...params} label="Proveedor *" error={!!errors.providerUuid} helperText={errors.providerUuid?.message ?? ' '} />
+                    )}
+                  />
                 )} />
               </Stack>
 
               <Stack direction="row" spacing={2}>
                 <Controller name="productUuid" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Producto *" fullWidth error={!!errors.productUuid} helperText={errors.productUuid?.message ?? ' '}>
-                    <MenuItem value="" disabled>Selecciona un producto</MenuItem>
-                    {(products ?? []).map((prod: ProductRaw) => (
-                      <MenuItem key={prod.uuid} value={prod.uuid}>{prod.name}</MenuItem>
-                    ))}
-                  </TextField>
+                  <Autocomplete
+                    options={productOptions}
+                    getOptionLabel={(option: ProductRaw) => option.name}
+                    value={productOptions.find((product) => product.uuid === field.value) ?? null}
+                    onChange={(_, newValue) => field.onChange(newValue?.uuid ?? '')}
+                    isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
+                    noOptionsText={selectedProviderUuid ? 'Sin productos para este proveedor' : 'Selecciona un proveedor primero'}
+                    disabled={!selectedProviderUuid}
+                    fullWidth
+                    renderInput={(params) => (
+                      <TextField {...params} label="Producto *" error={!!errors.productUuid} helperText={errors.productUuid?.message ?? ' '} />
+                    )}
+                  />
                 )} />
                 <Controller name="currency" control={control} render={({ field }) => (
                   <TextField {...field} select label="Moneda *" fullWidth error={!!errors.currency} helperText={errors.currency?.message ?? ' '}>

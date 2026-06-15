@@ -1,6 +1,6 @@
 import { Box, Container } from '@mui/material'
 import type { PaletteMode } from '@mui/material/styles'
-import { Navigate, Outlet } from 'react-router'
+import { Navigate, Outlet, useLocation } from 'react-router'
 import { Footer } from './Footer'
 import { Navbar } from './Navbar'
 import { useAuthStore } from '../store/useAuthStore'
@@ -11,10 +11,24 @@ type AppShellProps = {
 }
 
 export function AppShell({ mode, onToggleMode }: AppShellProps) {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const { isAuthenticated, accessNodes, activeModuleSlug } = useAuthStore()
+  const location = useLocation()
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  const moduleCount = accessNodes.reduce((count, node) => count + node.modules.length, 0)
+  if (moduleCount > 1 && !activeModuleSlug) {
+    return <Navigate to="/select-module" replace />
+  }
+
+  if (activeModuleSlug === 'security' && location.pathname.startsWith('/maintenance')) {
+    return <Navigate to="/security" replace />
+  }
+
+  if (activeModuleSlug === 'ssm' && (location.pathname.startsWith('/security') || location.pathname === '/users')) {
+    return <Navigate to="/dashboard" replace />
   }
 
   return (

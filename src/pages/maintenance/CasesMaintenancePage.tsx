@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import * as z from 'zod'
 import dayjs from 'dayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { addCommentApi, createCase, fetchCaseDetail, fetchCases, fetchClients, fetchPolicies, fetchUsers, fetchTags, removeCase, updateCase } from '../../api/maintenanceApi'
+import { addCommentApi, createCase, fetchCaseDetail, fetchCases, fetchClients, fetchPolicies, fetchUsers, fetchTags, removeCase, updateCase, verifySupervisorAuthorizationApi } from '../../api/maintenanceApi'
 import type { CaseDetail, CaseRaw, ClientRaw, PolicyRaw, UserRaw, TagRaw } from '../../api/maintenanceApi'
 import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
@@ -48,6 +48,48 @@ function initials(first: string, last: string) {
 function formatDate(iso: string | null | undefined) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('es-GT', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function auditActionLabel(action: string) {
+  const labels: Record<string, string> = {
+    create: 'Creado',
+    update: 'Actualizado',
+    delete: 'Eliminado',
+    status_change: 'Cambio de estado',
+    comment: 'Comentario agregado',
+    assign: 'Asignado',
+    login: 'Inicio de sesion',
+    logout: 'Cierre de sesion',
+    restore: 'Restaurado',
+  }
+  return labels[action] ?? auditActionLabels[action] ?? action
+}
+
+function normalizeCaseInput(data: CaseFormData) {
+  return {
+    ...data,
+    description: data.description?.trim() || undefined,
+    dueAt: data.dueAt || undefined,
+    policyId: data.policyId || undefined,
+    assignedUserId: data.assignedUserId || undefined,
+    tagUuids: data.tagUuids ?? [],
+  }
+}
+
+function withSelectedOption<T extends { uuid: string }>(
+  options: T[] | null | undefined,
+  selected: T | null | undefined,
+) {
+  const nextOptions = [...(options ?? [])]
+  if (selected && !nextOptions.some((option) => option.uuid === selected.uuid)) {
+    nextOptions.unshift(selected)
+  }
+  return nextOptions
+}
+
+function isSupervisorUser(user: UserRaw) {
+  const privilegedRoles = ['owner', 'administrator', 'manager']
+  return user.roles.some((role) => privilegedRoles.includes(role.toLowerCase()))
 }
 
 function StatusChip({ status }: { status: string }) {
@@ -113,6 +155,8 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
   // Closing case states
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
   const [closeReason, setCloseReason] = useState('')
+  const [supervisorEmail, setSupervisorEmail] = useState('')
+  const [supervisorPassword, setSupervisorPassword] = useState('')
   const [isSubmittingClose, setIsSubmittingClose] = useState(false)
 
   const { data: detail, loading, refetch } = useApiQuery(
@@ -138,24 +182,28 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
   }
 
   const handleCloseCaseSubmit = async () => {
-    if (!caseUuid || !closeReason.trim()) return
+    if (!caseUuid || !closeReason.trim() || !supervisorEmail || !supervisorPassword) return
     setIsSubmittingClose(true)
     try {
+      await verifySupervisorAuthorizationApi(supervisorEmail, supervisorPassword)
       await addCommentApi(caseUuid, `Razón de cierre: ${closeReason}`, false)
       await updateCase({ uuid: caseUuid, status: 'Closed' })
       toast.success('Caso cerrado exitosamente')
       setCloseReason('')
+      setSupervisorEmail('')
+      setSupervisorPassword('')
       setCloseDialogOpen(false)
       refetch()
       onRefresh()
     } catch (err: any) {
-      toast.error(friendlyError(err, 'Error al cerrar el caso'))
+      toast.error(friendlyError(err, 'No se pudo autorizar la accion.'))
     } finally {
       setIsSubmittingClose(false)
     }
   }
 
   const [isActivating, setIsActivating] = useState(false)
+  const supervisorUsers = (users ?? []).filter(isSupervisorUser)
 
   const handleActivateCaseClick = async () => {
     if (!caseUuid) return
@@ -579,17 +627,19 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
                           {idx < detail.auditLogs.length - 1 && <Box sx={{ width: 2, flex: 1, bgcolor: 'divider', my: 0.5 }} />}
                         </Box>
                         <Box sx={{ pb: 2, flex: 1 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                            {auditActionLabels[log.action] ?? log.action}
-                          </Typography>
-                          {log.actor && (
-                            <Typography variant="caption" sx={{ color: 'text.secondary', ml: 1 }}>
-                              por {log.actor.firstName} {log.actor.lastName}
-                            </Typography>
-                          )}
-                          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
-                            {formatDate(log.createdAt)}
-                          </Typography>
+                          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: 12, fontWeight: 700 }}>
+                              {log.actor ? initials(log.actor.firstName, log.actor.lastName) : 'H'}
+                            </Avatar>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }}>
+                                {auditActionLabel(log.action)}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                                {log.actor ? `${log.actor.firstName} ${log.actor.lastName}` : 'Sistema'} · {formatDate(log.createdAt)}
+                              </Typography>
+                            </Box>
+                          </Stack>
                           {renderAuditDiff(log.before, log.after)}
                         </Box>
                       </Box>
@@ -624,6 +674,28 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
               autoFocus
               placeholder="Ej. Se resolvió el reclamo y se notificó al cliente."
             />
+            <TextField
+              select
+              label="Supervisor *"
+              value={supervisorEmail}
+              onChange={(event) => setSupervisorEmail(event.target.value)}
+              fullWidth
+              helperText="Requiere autorizacion de un usuario con jerarquia superior."
+            >
+              {supervisorUsers.map((user) => (
+                <MenuItem key={user.uuid} value={user.email}>
+                  {user.firstName} {user.lastName} ({user.email})
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="Contraseña del supervisor *"
+              type="password"
+              value={supervisorPassword}
+              onChange={(event) => setSupervisorPassword(event.target.value)}
+              fullWidth
+              autoComplete="current-password"
+            />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
@@ -633,7 +705,7 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
           <Button
             variant="contained"
             color="success"
-            disabled={isSubmittingClose || !closeReason.trim()}
+            disabled={isSubmittingClose || !closeReason.trim() || !supervisorEmail || !supervisorPassword}
             onClick={handleCloseCaseSubmit}
             startIcon={isSubmittingClose ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
@@ -725,13 +797,14 @@ export function CasesMaintenancePage() {
 
   const onSubmit = async (data: any) => {
     try {
+      const input = normalizeCaseInput(data)
       if (dialogMode === 'create') {
         const caseNumber = `CAS-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
-        await createCase({ ...data, caseNumber })
+        await createCase({ ...input, caseNumber })
         toast.success('Caso de soporte creado exitosamente')
       } else {
         if (!selectedCase) return
-        await updateCase({ uuid: selectedCase.uuid, ...data })
+        await updateCase({ uuid: selectedCase.uuid, ...input })
         toast.success('Caso de soporte actualizado')
       }
       setDialogOpen(false)
@@ -783,6 +856,13 @@ export function CasesMaintenancePage() {
       ),
     },
   ]
+
+  const selectedClient = (selectedCase as any)?.client as ClientRaw | null | undefined
+  const selectedPolicy = (selectedCase as any)?.policy as PolicyRaw | null | undefined
+  const selectedAssignedUser = (selectedCase as any)?.assignedUser as UserRaw | null | undefined
+  const clientOptions = withSelectedOption(clients, selectedClient)
+  const policyOptions = withSelectedOption(policies, selectedPolicy)
+  const userOptions = withSelectedOption(users, selectedAssignedUser)
 
   return (
     <Stack spacing={4} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -921,9 +1001,9 @@ export function CasesMaintenancePage() {
               <Stack direction="row" spacing={2}>
                 <Controller name="clientId" control={control} render={({ field }) => (
                   <Autocomplete
-                    options={clients ?? []}
+                    options={clientOptions}
                     getOptionLabel={(option: ClientRaw) => option.displayName}
-                    value={(clients ?? []).find((c) => c.uuid === field.value) ?? null}
+                    value={clientOptions.find((c) => c.uuid === field.value) ?? null}
                     onChange={(_, newValue) => field.onChange(newValue?.uuid ?? '')}
                     isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
                     noOptionsText="Sin resultados"
@@ -935,9 +1015,9 @@ export function CasesMaintenancePage() {
                 )} />
                 <Controller name="policyId" control={control} render={({ field }) => (
                   <Autocomplete
-                    options={policies ?? []}
+                    options={policyOptions}
                     getOptionLabel={(option: PolicyRaw) => option.policyNumber}
-                    value={(policies ?? []).find((p) => p.uuid === field.value) ?? null}
+                    value={policyOptions.find((p) => p.uuid === field.value) ?? null}
                     onChange={(_, newValue) => field.onChange(newValue?.uuid ?? '')}
                     isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
                     noOptionsText="Sin resultados"
@@ -951,9 +1031,9 @@ export function CasesMaintenancePage() {
 
               <Controller name="assignedUserId" control={control} render={({ field }) => (
                 <Autocomplete
-                  options={users ?? []}
+                  options={userOptions}
                   getOptionLabel={(option: UserRaw) => `${option.firstName} ${option.lastName} (${option.email})`}
-                  value={(users ?? []).find((u) => u.uuid === field.value) ?? null}
+                  value={userOptions.find((u) => u.uuid === field.value) ?? null}
                   onChange={(_, newValue) => field.onChange(newValue?.uuid ?? '')}
                   isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
                   noOptionsText="Sin resultados"

@@ -50,6 +50,12 @@ export const caseStatusLabels: Record<string, string> = {
   WaitingForProvider: 'Esperando Proveedor',
   Closed: 'Cerrado',
   Cancelled: 'Cancelado',
+  pending: 'Pendiente',
+  in_progress: 'En Progreso',
+  waiting_for_client: 'Esperando Cliente',
+  waiting_for_provider: 'Esperando Proveedor',
+  closed: 'Cerrado',
+  cancelled: 'Cancelado',
 }
 
 export const casePriorityLabels: Record<string, string> = {
@@ -57,6 +63,10 @@ export const casePriorityLabels: Record<string, string> = {
   Medium: 'Media',
   High: 'Alta',
   Urgent: 'Urgente',
+  low: 'Baja',
+  medium: 'Media',
+  high: 'Alta',
+  urgent: 'Urgente',
 }
 
 export const caseTypeLabels: Record<string, string> = {
@@ -64,6 +74,12 @@ export const caseTypeLabels: Record<string, string> = {
   Renewal: 'Renovación',
   Endorsement: 'Endoso',
   Payment: 'Pago',
+  claim: 'Reclamo',
+  renewal: 'Renovacion',
+  endorsement: 'Endoso',
+  payment: 'Pago',
+  documentation: 'Documentacion',
+  general_support: 'Soporte General',
   Documentation: 'Documentación',
   GeneralSupport: 'Soporte General',
 }
@@ -161,4 +177,3 @@ export const esESGrid = {
   groupingColumnHeaderName: 'Grupo',
   noResultsFound: 'No se encontraron resultados',
 }
-

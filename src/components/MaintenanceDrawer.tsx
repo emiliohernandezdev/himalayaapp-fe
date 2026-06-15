@@ -4,9 +4,11 @@ import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { fetchMaintenanceModules } from '../api/maintenanceApi'
+import type { MaintenanceModuleDto } from '../api/maintenanceApi'
 import { useApiQuery } from '../api/useApiQuery'
 import { HimalayaLogo } from './HimalayaLogo'
 import { getMaintenanceModuleIcon } from './maintenanceModuleIcons'
+import { useAuthStore } from '../store/useAuthStore'
 import { useMaintenanceDrawerStore } from '../store/useMaintenanceDrawerStore'
 
 type MaintenanceDrawerProps = {
@@ -74,15 +76,70 @@ const viewOptions: Array<{ value: ModuleView; label: string; icon: LucideIcon }>
   { value: 'recent', label: 'Recientes', icon: Clock3 },
 ]
 
+const securityModules: MaintenanceModuleDto[] = [
+  {
+    uuid: 'security-overview',
+    slug: 'security-overview',
+    title: 'Panel Security',
+    description: 'Vista general de usuarios, roles, autorizaciones y actividad del sistema.',
+    route: '/security',
+    icon: 'LockKeyhole',
+    tone: 'slate',
+    sortOrder: 10,
+  },
+  {
+    uuid: 'security-users',
+    slug: 'security-users',
+    title: 'Usuarios',
+    description: 'Gestiona cuentas, datos de acceso, estados y perfiles operativos.',
+    route: '/users',
+    icon: 'UsersRound',
+    tone: 'sky',
+    sortOrder: 20,
+  },
+  {
+    uuid: 'security-roles',
+    slug: 'security-roles',
+    title: 'Roles',
+    description: 'Administra jerarquias y perfiles base para accesos del sistema.',
+    route: '/security',
+    icon: 'ShieldCheck',
+    tone: 'indigo',
+    sortOrder: 30,
+  },
+  {
+    uuid: 'security-matrix',
+    slug: 'security-matrix',
+    title: 'Matriz de seguridad',
+    description: 'Define accesos por nodo, modulo, mantenimiento y accion sensible.',
+    route: '/security',
+    icon: 'KeyRound',
+    tone: 'violet',
+    sortOrder: 40,
+  },
+  {
+    uuid: 'security-audit',
+    slug: 'security-audit',
+    title: 'Historico general',
+    description: 'Consulta acciones importantes, autorizaciones y cambios de informacion.',
+    route: '/security',
+    icon: 'Activity',
+    tone: 'teal',
+    sortOrder: 50,
+  },
+]
+
 export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProps) {
   const [query, setQuery] = useState('')
   const [view, setView] = useState<ModuleView>('all')
+  const activeModuleSlug = useAuthStore((state) => state.activeModuleSlug)
   const favoriteRoutes = useMaintenanceDrawerStore((state) => state.favoriteRoutes)
   const recentRoutes = useMaintenanceDrawerStore((state) => state.recentRoutes)
   const toggleFavorite = useMaintenanceDrawerStore((state) => state.toggleFavorite)
   const rememberRoute = useMaintenanceDrawerStore((state) => state.rememberRecent)
   const { data: moduleData, error, loading } = useApiQuery('maintenanceModules', fetchMaintenanceModules)
-  const modules = moduleData ?? []
+  const isSecurityModule = activeModuleSlug === 'security'
+  const modules = isSecurityModule ? securityModules : moduleData ?? []
   const normalizedQuery = query.trim().toLowerCase()
 
   const visibleModules = useMemo(() => {
@@ -159,7 +216,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
                 Himalaya
               </Typography>
               <Typography variant="body2" color="text.secondary" className="hidden sm:block">
-                Administracion de seguros y fianzas
+                {isSecurityModule ? 'Security - usuarios, roles y auditoria' : 'SSM - administracion de seguros y fianzas'}
               </Typography>
             </Box>
           </Stack>
@@ -170,7 +227,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
 
         <Box className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
           <Stack spacing={3} className="mx-auto max-w-7xl">
-            {error ? (
+            {error && !isSecurityModule ? (
               <Alert severity="error">
                 No se pudieron cargar los mantenimientos desde la API.
               </Alert>
@@ -213,7 +270,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
               </Stack>
             </Stack>
 
-            {loading ? (
+            {loading && !isSecurityModule ? (
               <Box className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, index) => (
                   <Box

@@ -70,7 +70,7 @@ export function MaintenanceRecordsView({
 
   const handleSaveMock = () => {
     setDialogOpen(false)
-    toast.info('Para guardar, necesitamos las mutaciones GraphQL específicas para ' + title)
+    toast.info('El guardado de esta seccion todavia no esta disponible para ' + title)
   }
 
   return (
@@ -272,7 +272,7 @@ export function MaintenanceRecordsView({
               Aquí se montará el formulario dinámico para <strong>{title}</strong>. 
             </Typography>
             <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary', opacity: 0.8 }}>
-              Para hacerlo completamente funcional necesitamos conectar las mutaciones (Mutations) de GraphQL en el backend.
+              Para hacerlo completamente funcional necesitamos habilitar el guardado en el servidor.
             </Typography>
           </Box>
         </DialogContent>

@@ -1,6 +1,6 @@
 import { Avatar, Box, Container, IconButton, Stack, Tooltip, Typography, Menu, MenuItem, ListItemIcon, Divider, ButtonBase } from '@mui/material'
 import type { PaletteMode } from '@mui/material/styles'
-import { LogOut, Moon, Sun, User as UserIcon } from 'lucide-react'
+import { Layers, LogOut, Moon, Sun, User as UserIcon } from 'lucide-react'
 import { useState } from 'react'
 import { AppLauncherIcon } from './AppLauncherIcon'
 import { HimalayaLogo } from './HimalayaLogo'
@@ -20,8 +20,10 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
   const menuOpen = Boolean(anchorEl)
   
   const ThemeIcon = mode === 'light' ? Moon : Sun
-  const { user, logout } = useAuthStore()
+  const { user, logout, accessNodes, activeModuleSlug } = useAuthStore()
   const navigate = useNavigate()
+  const moduleCount = accessNodes.reduce((count, node) => count + node.modules.length, 0)
+  const activeModule = accessNodes.flatMap((node) => node.modules).find((module) => module.slug === activeModuleSlug)
 
   const handleLogout = () => {
     logout()
@@ -52,7 +54,7 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
                 Himalaya
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' }, fontSize: '0.75rem' }} className="truncate">
-                Administración de seguros y fianzas
+                {activeModule ? activeModule.title : 'Administracion de seguros y fianzas'}
               </Typography>
             </Box>
             <Tooltip title="Abrir mantenimientos">
@@ -164,6 +166,14 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
                     </Typography>
                   </Box>
                   <Divider />
+                  {moduleCount > 1 && (
+                    <MenuItem onClick={() => { logout(); navigate('/login') }} sx={{ py: 1, fontSize: '0.875rem' }}>
+                      <ListItemIcon sx={{ minWidth: '32px !important' }}>
+                        <Layers size={16} />
+                      </ListItemIcon>
+                      Cambiar modulo
+                    </MenuItem>
+                  )}
                   <MenuItem onClick={() => { navigate('/users'); toast.info('Perfil de usuario') }} sx={{ py: 1, fontSize: '0.875rem' }}>
                     <ListItemIcon sx={{ minWidth: '32px !important' }}>
                       <UserIcon size={16} />
