@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  color-scheme: light;
+  --himalaya-bg: #f5f9fd;
+  --himalaya-surface: #ffffff;
+  --himalaya-surface-soft: #eef7ff;
+  --himalaya-panel: #e3f0fa;
+  --himalaya-primary: #075985;
+  --himalaya-primary-soft: #e0f2fe;
+  --himalaya-accent: #0f766e;
+  --himalaya-text: #0f172a;
+  --himalaya-muted: #475569;
+  --himalaya-border: #cfe1ef;
+  --himalaya-shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
+}
+
+:root:has([data-theme="dark"]),
+[data-theme="dark"] {
+  color-scheme: dark;
+  --himalaya-bg: #07111f;
+  --himalaya-surface: #0c1b2a;
+  --himalaya-surface-soft: #10283d;
+  --himalaya-panel: #14344d;
+  --himalaya-primary: #7dd3fc;
+  --himalaya-primary-soft: #12314a;
+  --himalaya-accent: #5eead4;
+  --himalaya-text: #f8fafc;
+  --himalaya-muted: #b6c7d6;
+  --himalaya-border: #24435b;
+  --himalaya-shadow: 0 16px 42px rgba(0, 0, 0, 0.32);
+}
+
+html {
+  min-width: 320px;
+  background: var(--himalaya-bg);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}

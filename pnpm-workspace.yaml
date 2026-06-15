@@ -1,0 +1,10 @@
+minimumReleaseAgeExclude:
+  - '@mui/core-downloads-tracker@9.1.1'
+  - '@mui/material@9.1.1'
+  - '@mui/private-theming@9.1.1'
+  - '@mui/styled-engine@9.1.1'
+  - '@mui/system@9.1.1'
+  - '@mui/types@9.1.1'
+  - '@mui/utils@9.1.1'
+  - '@mui/x-data-grid@9.5.0'
+  - '@mui/x-date-pickers@9.5.0'
