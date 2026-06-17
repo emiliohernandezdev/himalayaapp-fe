@@ -1,8 +1,9 @@
-import { Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Stack, TextField, Typography } from '@mui/material'
+import { Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, InputLabel, MenuItem, OutlinedInput, Select, Stack, TextField, Typography } from '@mui/material'
 import type { GridColDef } from '@mui/x-data-grid'
 import { Plus, Trash2, UserRoundCog } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import * as z from 'zod'
 import { createSecurityUser, fetchSecurityUsers, removeSecurityUser, updateSecurityUser, userRoleLabels, userRoles, userStatuses } from '../api/securityApi'
 import type { SecurityUser } from '../api/securityApi'
 import { useApiQuery } from '../api/useApiQuery'
@@ -12,6 +13,18 @@ import { usePermission } from '../hooks/usePermission'
 import { esESGrid } from '../utils/enumLabels'
 
 const emptyForm = { email: '', firstName: '', lastName: '', status: 'active', roles: ['Assistant'], password: '' }
+
+const userSchema = z.object({
+  email: z.string().trim().min(1, 'El correo es obligatorio.').email('Ingresa un correo valido.'),
+  firstName: z.string().trim().min(2, 'El nombre debe tener al menos 2 caracteres.').max(80, 'El nombre es demasiado largo.'),
+  lastName: z.string().trim().min(2, 'El apellido debe tener al menos 2 caracteres.').max(80, 'El apellido es demasiado largo.'),
+  status: z.enum(['active', 'suspended', 'inactive'], { error: 'Selecciona un estado valido.' }),
+  roles: z.array(z.string()).min(1, 'Selecciona al menos un rol.'),
+  password: z.string().max(120, 'La contrasena es demasiado larga.').optional(),
+})
+
+type UserForm = z.infer<typeof userSchema>
+type UserFormErrors = Partial<Record<keyof UserForm, string>>
 
 const userStatusLabels: Record<string, string> = {
   active: 'Activo',
@@ -24,19 +37,37 @@ export function UsersPage() {
   const canManageUsers = usePermission('manage_users')
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<SecurityUser | null>(null)
-  const [form, setForm] = useState<any>(emptyForm)
+  const [form, setForm] = useState<UserForm>(emptyForm)
+  const [formErrors, setFormErrors] = useState<UserFormErrors>({})
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<SecurityUser | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const save = async () => {
+    const parsed = userSchema.safeParse(form)
+    const password = form.password?.trim() ?? ''
+    if (!parsed.success || (!selected && password.length < 8) || (selected && password.length > 0 && password.length < 8)) {
+      const nextErrors: UserFormErrors = {}
+      if (!parsed.success) {
+        parsed.error.issues.forEach((issue) => {
+          const field = issue.path[0] as keyof UserForm | undefined
+          if (field) nextErrors[field] = issue.message
+        })
+      }
+      if (!selected && password.length < 8) nextErrors.password = 'La contrasena debe tener al menos 8 caracteres.'
+      if (selected && password.length > 0 && password.length < 8) nextErrors.password = 'La nueva contrasena debe tener al menos 8 caracteres.'
+      setFormErrors(nextErrors)
+      return
+    }
+
     try {
+      setFormErrors({})
       if (selected) {
-        const input = { uuid: selected.uuid, ...form }
+        const input: any = { uuid: selected.uuid, ...parsed.data, password }
         if (!input.password) delete input.password
         await updateSecurityUser(input)
       } else {
-        await createSecurityUser(form)
+        await createSecurityUser({ ...parsed.data, password })
       }
       toast.success('Usuario guardado')
       setOpen(false)
@@ -118,7 +149,7 @@ export function UsersPage() {
       <PageHeader title="Usuarios" description="Cuentas, estados y roles de acceso." actionLabel="" icon={UserRoundCog} />
       {canManageUsers && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => { setSelected(null); setForm(emptyForm); setOpen(true) }}>Nuevo usuario</Button>
+          <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => { setSelected(null); setForm(emptyForm); setFormErrors({}); setOpen(true) }}>Nuevo usuario</Button>
         </Box>
       )}
       <ResponsiveDataGrid
@@ -130,24 +161,25 @@ export function UsersPage() {
         localeText={esESGrid}
         getRowHeight={() => 'auto'}
         sx={{ '& .MuiDataGrid-cell': { py: 1 } }}
-        onRowClick={(p) => { setSelected(p.row); setForm({ ...p.row, password: '' }); setOpen(true) }}
+        onRowClick={(p) => { setSelected(p.row); setForm({ ...p.row, password: '' }); setFormErrors({}); setOpen(true) }}
       />
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{selected ? 'Editar usuario' : 'Nuevo usuario'}</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Nombre" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} fullWidth />
-            <TextField label="Apellido" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} fullWidth />
-            <TextField label="Correo" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} fullWidth />
-            <TextField label={selected ? 'Nueva contrasena' : 'Contrasena'} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} fullWidth />
-            <TextField select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} fullWidth>
+            <TextField label="Nombre" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} fullWidth error={!!formErrors.firstName} helperText={formErrors.firstName ?? 'Nombre real del usuario.'} />
+            <TextField label="Apellido" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} fullWidth error={!!formErrors.lastName} helperText={formErrors.lastName ?? 'Apellido real del usuario.'} />
+            <TextField label="Correo" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} fullWidth error={!!formErrors.email} helperText={formErrors.email ?? 'Se usara para iniciar sesion.'} />
+            <TextField label={selected ? 'Nueva contrasena' : 'Contrasena'} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} fullWidth error={!!formErrors.password} helperText={formErrors.password ?? (selected ? 'Opcional. Escribela solo si deseas cambiarla.' : 'Minimo 8 caracteres.')} />
+            <TextField select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as UserForm['status'] })} fullWidth error={!!formErrors.status} helperText={formErrors.status ?? 'Define si la cuenta puede acceder.'}>
               {userStatuses.map((s) => <MenuItem key={s} value={s}>{userStatusLabels[s] ?? s}</MenuItem>)}
             </TextField>
-            <FormControl fullWidth>
+            <FormControl fullWidth error={!!formErrors.roles}>
               <InputLabel>Roles</InputLabel>
               <Select multiple value={form.roles} input={<OutlinedInput label="Roles" />} onChange={(e) => setForm({ ...form, roles: e.target.value })}>
                 {userRoles.map((r) => <MenuItem key={r} value={r}>{userRoleLabels[r]}</MenuItem>)}
               </Select>
+              <FormHelperText>{formErrors.roles ?? 'Selecciona los permisos base del usuario.'}</FormHelperText>
             </FormControl>
           </Stack>
         </DialogContent>

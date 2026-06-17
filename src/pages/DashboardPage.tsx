@@ -56,17 +56,18 @@ import * as Lucide from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
+import * as z from 'zod'
+import dayjs from 'dayjs'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import {
   fetchDashboardSummary,
-  fetchClients,
-  fetchPolicies,
-  fetchCases,
   fetchUserDashboards,
   saveUserDashboardApi,
   removeUserDashboardApi,
   setPrimaryDashboardApi,
   fetchWidgets,
   fetchSystemHealth,
+  fetchDashboardWidgetData,
   type SystemHealthDto,
 } from '../api/maintenanceApi'
 import { useApiQuery } from '../api/useApiQuery'
@@ -118,6 +119,9 @@ type WidgetSettings = {
   dataSource?: 'clientes' | 'polizas' | 'casos'
   chartType?: 'bar' | 'line' | 'pie' | 'scatter' | 'sparkline'
   groupByField?: string
+  aggregateFunction?: string
+  aggregateField?: string
+  daysWindow?: number
   fieldsToShow?: string[]
   filters?: WidgetFilter[]
   dateField?: string
@@ -135,6 +139,75 @@ type DashboardConfig = {
   layout: Record<string, WidgetLayout>
   settings?: Record<string, WidgetSettings>
   instances?: WidgetInstance[]
+}
+
+type DashboardRecord = {
+  uuid?: string
+  name: string
+  config: DashboardConfig
+  isPrimary?: boolean
+}
+
+const dashboardNameSchema = z.object({
+  name: z.string()
+    .trim()
+    .min(2, 'El nombre debe tener al menos 2 caracteres.')
+    .max(60, 'El nombre no puede superar 60 caracteres.')
+    .regex(/^[\p{L}\p{N}\s._-]+$/u, 'Usa letras, numeros, espacios, punto, guion o guion bajo.'),
+})
+
+const widgetFilterSchema = z.object({
+  field: z.string().trim().min(1, 'Selecciona un campo.'),
+  operator: z.enum(['eq', 'neq', 'contains', 'not_contains', 'gt', 'lt', 'is_null', 'is_not_null']),
+  value: z.string().optional().nullable(),
+}).superRefine((filter, ctx) => {
+  if (!['is_null', 'is_not_null'].includes(filter.operator) && !String(filter.value ?? '').trim()) {
+    ctx.addIssue({ code: 'custom', path: ['value'], message: 'Ingresa un valor para el filtro.' })
+  }
+})
+
+const widgetSettingsSchema = z.object({
+  title: z.string().max(80, 'La etiqueta no puede superar 80 caracteres.').optional(),
+  subtitle: z.string().max(160, 'El subtitulo no puede superar 160 caracteres.').optional(),
+  dataSource: z.enum(['clientes', 'polizas', 'casos']).optional(),
+  groupByField: z.string().optional(),
+  aggregateFunction: z.string().optional(),
+  aggregateField: z.string().optional(),
+  daysWindow: z.number().min(1, 'La ventana minima es de 1 dia.').max(365, 'La ventana maxima es de 365 dias.').optional(),
+  limit: z.number().min(1, 'El minimo es 1.').max(100, 'El maximo es 100.').optional(),
+  fieldsToShow: z.array(z.string()).optional(),
+  filters: z.array(widgetFilterSchema).optional(),
+  xAxisLabel: z.string().max(40, 'La etiqueta no puede superar 40 caracteres.').optional(),
+  yAxisLabel: z.string().max(40, 'La etiqueta no puede superar 40 caracteres.').optional(),
+}).superRefine((settings, ctx) => {
+  if (settings.aggregateFunction && AGGREGATE_FIELD_REQUIRED.has(settings.aggregateFunction) && !settings.aggregateField) {
+    ctx.addIssue({ code: 'custom', path: ['aggregateField'], message: 'Selecciona el campo para calcular esta funcion.' })
+  }
+  if (settings.dataSource && settings.fieldsToShow && settings.fieldsToShow.length === 0) {
+    ctx.addIssue({ code: 'custom', path: ['fieldsToShow'], message: 'Selecciona al menos una columna.' })
+  }
+})
+
+type DashboardNameErrors = Partial<Record<'name', string>>
+type WidgetSettingsErrors = Record<string, string>
+
+function normalizeDashboards(dashboards: DashboardRecord[]) {
+  const seen = new Set<string>()
+  const unique = dashboards.filter((dashboard) => {
+    const key = dashboard.name.toLowerCase().trim()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  if (unique.length === 0) return unique
+
+  const primaryIndex = unique.findIndex((dashboard) => dashboard.isPrimary)
+  const safePrimaryIndex = primaryIndex >= 0 ? primaryIndex : 0
+
+  return unique
+    .map((dashboard, index) => ({ ...dashboard, isPrimary: index === safePrimaryIndex }))
+    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.name.localeCompare(b.name))
 }
 
 
@@ -168,11 +241,105 @@ function formatDateTime(value: string) {
   }).format(new Date(value))
 }
 
+function toCanonicalEnumValue(value: any) {
+  return String(value ?? '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .trim()
+}
+
 function statusLabel(status: string) {
-  return status
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
+  const key = toCanonicalEnumValue(status)
+  return (
+    enumLabels.status[key] ??
+    enumLabels.priority[key] ??
+    enumLabels.type[key] ??
+    key
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ')
+  )
+}
+
+const enumLabels = {
+  status: {
+    active: 'Activo',
+    inactive: 'Inactivo',
+    prospect: 'Prospecto',
+    draft: 'Borrador',
+    pending_renewal: 'Pendiente de renovación',
+    expired: 'Vencida',
+    cancelled: 'Cancelado',
+    pending: 'Pendiente',
+    in_progress: 'En proceso',
+    waiting_for_client: 'Esperando cliente',
+    waiting_for_provider: 'Esperando proveedor',
+    closed: 'Cerrado',
+  } as Record<string, string>,
+  priority: {
+    low: 'Baja',
+    medium: 'Media',
+    high: 'Alta',
+    urgent: 'Urgente',
+  } as Record<string, string>,
+  type: {
+    individual: 'Persona individual',
+    company: 'Empresa',
+    claim: 'Reclamo',
+    renewal: 'Renovación',
+    endorsement: 'Endoso',
+    payment: 'Pago',
+    documentation: 'Documentación',
+    general_support: 'Soporte general',
+  } as Record<string, string>,
+}
+
+function getFieldDisplayValue(dataSource: string, field: string, value: any, row?: any) {
+  if (value == null || value === '') return 'N/A'
+  if (field === 'premiumAmount' || field === 'insuredAmount') {
+    return new Intl.NumberFormat('es-GT', {
+      style: 'currency',
+      currency: row?.currency || 'GTQ',
+      maximumFractionDigits: 0,
+    }).format(Number(value))
+  }
+  if (isDateFilterField(field)) return formatDate(value)
+  const canonicalValue = toCanonicalEnumValue(value)
+  if (field === 'status') {
+    if (dataSource === 'polizas' && canonicalValue === 'active') return 'Vigente'
+    return enumLabels.status[canonicalValue] ?? statusLabel(String(value))
+  }
+  if (field === 'priority') return enumLabels.priority[canonicalValue] ?? statusLabel(String(value))
+  if (field === 'type') return enumLabels.type[canonicalValue] ?? statusLabel(String(value))
+  return String(value)
+}
+
+function normalizeFilterValue(dataSource: string, field: string, value: any) {
+  const raw = toCanonicalEnumValue(value)
+  if (dataSource === 'polizas' && field === 'status') {
+    if (raw === 'active_policy' || raw === 'vigente') return 'active'
+    if (raw === 'pending') return 'pending_renewal'
+  }
+  if (dataSource === 'clientes' && field === 'status') {
+    if (raw === 'suspended') return 'inactive'
+    if (raw === 'invited') return 'prospect'
+  }
+  if (dataSource === 'clientes' && field === 'type') {
+    if (raw === 'corporate') return 'company'
+  }
+  if (dataSource === 'casos' && field === 'type') {
+    if (raw === 'inquiry' || raw === 'support') return 'general_support'
+    if (raw === 'billing') return 'payment'
+  }
+  return raw
+}
+
+function getStatusColor(value: any) {
+  const normalized = toCanonicalEnumValue(value)
+  if (['active', 'closed'].includes(normalized)) return 'success'
+  if (['pending', 'pending_renewal', 'in_progress', 'waiting_for_client', 'waiting_for_provider'].includes(normalized)) return 'warning'
+  if (['expired', 'cancelled', 'inactive', 'urgent'].includes(normalized)) return 'error'
+  return 'default'
 }
 
 
@@ -318,6 +485,7 @@ function WidgetShell({
   editing,
   onConfigure,
   onRemove,
+  onRefresh,
 }: {
   title: string
   description: string
@@ -326,18 +494,27 @@ function WidgetShell({
   editing: boolean
   onConfigure?: () => void
   onRemove?: () => void
+  onRefresh?: () => void
 }) {
   return (
-    <Stack spacing={1.5} sx={{ height: '100%', minWidth: 0 }}>
+    <Stack spacing={1.75} sx={{ height: '100%', minWidth: 0 }}>
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <Stack direction="row" spacing={1.25} sx={{ minWidth: 0, flex: 1 }}>
-          <Box className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[var(--himalaya-primary-soft)] text-[var(--himalaya-primary)]">
+          <Box
+            className="grid h-11 w-11 shrink-0 place-items-center text-[var(--himalaya-primary)]"
+            sx={{
+              borderRadius: 3,
+              bgcolor: 'action.hover',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
             <Icon size={19} />
           </Box>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="subtitle1" noWrap sx={{ fontWeight: 600, fontSize: '0.95rem' }}>{title}</Typography>
+            <Typography variant="subtitle1" noWrap sx={{ fontWeight: 760, fontSize: '0.96rem', letterSpacing: 0 }}>{title}</Typography>
             {description && (
-              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', maxWidth: '85%' }}>
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', maxWidth: '90%', mt: 0.15 }}>
                 {description}
               </Typography>
             )}
@@ -373,6 +550,17 @@ function WidgetShell({
               <GripVertical size={16} />
             </Box>
           </Stack>
+        )}
+        {!editing && onRefresh && (
+          <Tooltip title="Actualizar widget">
+            <Button
+              size="small"
+              sx={{ minWidth: 32, width: 32, height: 32, p: 0, borderRadius: '50%', color: 'text.secondary' }}
+              onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+            >
+              <RefreshCcw size={15} />
+            </Button>
+          </Tooltip>
         )}
       </Stack>
       <Box
@@ -587,11 +775,13 @@ function CustomWidgetEmptyState({ title, onConfigure }: { title: string; onConfi
 
 function CustomDataGridWidget({
   settings,
+  loading,
   clientsData,
   policiesData,
   casesData,
 }: {
   settings: WidgetSettings
+  loading?: boolean
   clientsData?: any[]
   policiesData?: any[]
   casesData?: any[]
@@ -613,8 +803,12 @@ function CustomDataGridWidget({
     setPage(0)
   }, [source])
 
-  if (!rawData || rawData.length === 0) {
+  if (loading) {
     return <EmptyWidgetState text="Cargando información del origen de datos..." />
+  }
+
+  if (!rawData || rawData.length === 0) {
+    return <EmptyWidgetState text="Sin datos para los filtros configurados." />
   }
 
   const fields = settings.fieldsToShow ?? (
@@ -668,38 +862,13 @@ function CustomDataGridWidget({
             {items.map((row: any) => (
               <tr key={row.uuid || row.id} style={{ borderBottom: '1px solid color-mix(in srgb, var(--himalaya-border) 35%, transparent)' }}>
                 {fields.map((f: string) => {
-                  let val = row[f]
-                  if (f === 'premiumAmount' || f === 'insuredAmount') {
-                    val = val != null ? new Intl.NumberFormat('es-GT', { style: 'currency', currency: row.currency || 'GTQ', maximumFractionDigits: 0 }).format(Number(val)) : 'N/A'
-                  }
-                  if (f === 'startDate' || f === 'endDate' || f === 'dueAt') {
-                    val = val ? new Intl.DateTimeFormat('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(val)) : 'N/A'
-                  }
-                  if (typeof val === 'string' && (val === 'active' || val === 'active_policy' || val === 'vigente')) {
+                  const rawValue = row[f]
+                  const val = getFieldDisplayValue(source, f, rawValue, row)
+
+                  if (f === 'status' || f === 'priority') {
                     return (
                       <td key={f} style={{ padding: '8px 4px' }}>
-                        <Chip size="small" label="Activo" color="success" variant="outlined" sx={{ height: 16, fontSize: '0.65rem' }} />
-                      </td>
-                    )
-                  }
-                  if (typeof val === 'string' && (val === 'pending' || val === 'en_proceso' || val === 'in_progress')) {
-                    return (
-                      <td key={f} style={{ padding: '8px 4px' }}>
-                        <Chip size="small" label="En proceso" color="warning" variant="outlined" sx={{ height: 16, fontSize: '0.65rem' }} />
-                      </td>
-                    )
-                  }
-                  if (typeof val === 'string' && (val === 'closed' || val === 'completado')) {
-                    return (
-                      <td key={f} style={{ padding: '8px 4px' }}>
-                        <Chip size="small" label="Cerrado" color="info" variant="outlined" sx={{ height: 16, fontSize: '0.65rem' }} />
-                      </td>
-                    )
-                  }
-                  if (typeof val === 'string' && (val === 'cancelled' || val === 'cancelado')) {
-                    return (
-                      <td key={f} style={{ padding: '8px 4px' }}>
-                        <Chip size="small" label="Cancelado" color="error" variant="outlined" sx={{ height: 16, fontSize: '0.65rem' }} />
+                        <Chip size="small" label={val} color={getStatusColor(rawValue) as any} variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 99 }} />
                       </td>
                     )
                   }
@@ -742,6 +911,91 @@ function CustomDataGridWidget({
           </Stack>
         </Stack>
       )}
+    </Stack>
+  )
+}
+
+function CustomListWidget({
+  settings,
+  loading,
+  clientsData,
+  policiesData,
+  casesData,
+}: {
+  settings: WidgetSettings
+  loading?: boolean
+  clientsData?: any[]
+  policiesData?: any[]
+  casesData?: any[]
+}) {
+  const source = settings.dataSource ?? 'clientes'
+  const limit = settings.limit ?? 5
+  const rawData = source === 'clientes'
+    ? clientsData
+    : source === 'polizas'
+      ? policiesData
+      : casesData
+
+  if (loading) {
+    return <EmptyWidgetState text="Cargando información del origen de datos..." />
+  }
+
+  if (!rawData || rawData.length === 0) {
+    return <EmptyWidgetState text="Sin datos para los filtros configurados." />
+  }
+
+  const fields = settings.fieldsToShow ?? (
+    source === 'clientes'
+      ? ['displayName', 'status', 'email']
+      : source === 'polizas'
+        ? ['policyNumber', 'status', 'endDate']
+        : ['caseNumber', 'title', 'dueAt']
+  )
+
+  const labels: Record<string, string> = {
+    displayName: 'Cliente',
+    status: 'Estado',
+    email: 'Correo',
+    policyNumber: 'Póliza',
+    endDate: 'Vence',
+    caseNumber: 'Caso',
+    title: 'Título',
+    dueAt: 'Vence',
+    priority: 'Prioridad',
+  }
+
+  return (
+    <Stack spacing={1.25}>
+      {rawData.slice(0, limit).map((row: any, index: number) => {
+        const primaryField = fields[0]
+        const primaryValue = getFieldDisplayValue(source, primaryField, row[primaryField], row)
+        const secondaryFields = fields.slice(1, 4)
+
+        return (
+          <Box
+            key={row.uuid || row.id || `${primaryValue}-${index}`}
+            className="rounded-lg border border-[var(--himalaya-border)] bg-[var(--himalaya-surface-soft)] p-3"
+          >
+            <Stack spacing={0.75}>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {primaryValue}
+              </Typography>
+              <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', rowGap: 0.75 }}>
+                {secondaryFields.map((field) => (
+                  <Chip
+                    key={field}
+                    size="small"
+                    variant="outlined"
+                    color={(field === 'status' || field === 'priority') ? getStatusColor(row[field]) as any : 'default'}
+                    label={`${labels[field] ?? field}: ${getFieldDisplayValue(source, field, row[field], row)}`}
+                    sx={{ borderRadius: 99 }}
+                  />
+                ))}
+              </Stack>
+            </Stack>
+          </Box>
+        )
+      })}
     </Stack>
   )
 }
@@ -978,11 +1232,15 @@ function CustomBubbleChart({
 
 function CustomMetricWidget({
   settings,
+  aggregateLabel,
+  aggregateValue,
   clientsData,
   policiesData,
   casesData,
 }: {
   settings: WidgetSettings
+  aggregateLabel?: string
+  aggregateValue?: string
   clientsData?: any[]
   policiesData?: any[]
   casesData?: any[]
@@ -990,12 +1248,10 @@ function CustomMetricWidget({
   const source = settings.dataSource ?? 'clientes'
   const tone = settings.tone ?? 'primary'
 
-  let label = 'Métrica'
   let value = '0'
   let detail = ''
 
   if (source === 'clientes') {
-    label = 'Clientes Totales'
     value = clientsData ? clientsData.length.toString() : '0'
     if (clientsData) {
       const activeCount = clientsData.filter((c) => {
@@ -1005,7 +1261,6 @@ function CustomMetricWidget({
       detail = activeCount > 0 ? (activeCount === clientsData.length ? 'Clientes activos' : `${activeCount} activos`) : ''
     }
   } else if (source === 'polizas') {
-    label = 'Pólizas Totales'
     value = policiesData ? policiesData.length.toString() : '0'
     if (policiesData) {
       const activeCount = policiesData.filter((p) => {
@@ -1015,7 +1270,6 @@ function CustomMetricWidget({
       detail = activeCount > 0 ? (activeCount === policiesData.length ? 'Pólizas vigentes' : `${activeCount} vigentes`) : ''
     }
   } else if (source === 'casos') {
-    label = 'Casos Totales'
     value = casesData ? casesData.length.toString() : '0'
     if (casesData) {
       const activeCount = casesData.filter((c) => {
@@ -1024,6 +1278,11 @@ function CustomMetricWidget({
       }).length
       detail = activeCount > 0 ? (activeCount === casesData.length ? 'Casos pendientes' : `${activeCount} pendientes`) : ''
     }
+  }
+
+  if (aggregateValue) {
+    value = aggregateValue
+    detail = aggregateLabel || detail
   }
 
   const toneColor =
@@ -1213,46 +1472,246 @@ function CustomSystemHealthWidget() {
   )
 }
 
-function CustomPremiumSummaryWidget({
-  policiesData,
+function DynamicWidgetContent({
+  widget,
+  settings,
+  instanceId,
+  refreshVersion,
+  onConfigure,
 }: {
-  policiesData?: any[]
+  widget: WidgetDefinition
+  settings: WidgetSettings
+  instanceId: string
+  refreshVersion: number
+  onConfigure: () => void
 }) {
-  const data = policiesData || []
+  const source = settings.dataSource
+  const queryInput = useMemo(() => {
+    if (!source) return null
+    return {
+      dataSource: source,
+      fieldsToShow: settings.fieldsToShow,
+      filtersJson: JSON.stringify(settings.filters ?? []),
+      groupByField: settings.groupByField ?? 'status',
+      aggregateFunction: settings.aggregateFunction ?? 'count',
+      aggregateField: settings.aggregateField ?? null,
+      daysWindow: settings.daysWindow ?? 30,
+      limit: settings.limit ?? 20,
+    }
+  }, [source, settings.fieldsToShow, settings.filters, settings.groupByField, settings.aggregateFunction, settings.aggregateField, settings.daysWindow, settings.limit])
 
-  const totalVolume = data.reduce((acc, p) => {
-    return acc + parseFloat(p.premiumAmount || '0')
-  }, 0)
+  const { data, error, loading } = useApiQuery(
+    `dashboard-widget-data:${instanceId}:${refreshVersion}:${JSON.stringify(queryInput)}`,
+    () => queryInput ? fetchDashboardWidgetData(queryInput) : Promise.resolve(null),
+  )
 
-  const activeCount = data.filter((p) => {
-    const s = String(p.status || '').toLowerCase().replace(/_/g, '').trim()
-    return s === 'active' || s === 'activepolicy' || s === 'vigente'
-  }).length
-
-  const activePercentage = data.length > 0 ? Math.round((activeCount / data.length) * 100) : 0
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ', maximumFractionDigits: 0 }).format(val)
+  if (!source) {
+    return <CustomWidgetEmptyState title={widget.title} onConfigure={onConfigure} />
   }
 
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', gap: 1 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.68rem' }}>
-        Primas Totales Emitidas
-      </Typography>
-      <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: '-0.02em', background: 'linear-gradient(90deg, #0284c7 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-        {formatCurrency(totalVolume)}
-      </Typography>
-      <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mt: 0.5 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 550, fontSize: '0.68rem' }}>Pólizas Activas</Typography>
-          <Typography variant="caption" sx={{ fontWeight: 750 }}>
-            {activeCount} de {data.length} ({activePercentage}%)
-          </Typography>
-        </Box>
-      </Stack>
-    </Box>
-  )
+  if (loading) {
+    return <WidgetLoadingSkeleton presentationType={widget.presentationType} />
+  }
+
+  if (error) {
+    return (
+      <EmptyWidgetState
+        text="No se pudo cargar la información de este widget."
+        onConfigure={onConfigure}
+      />
+    )
+  }
+
+  if (!data) {
+    return <WidgetLoadingSkeleton presentationType={widget.presentationType} />
+  }
+
+  let rows: any[] = []
+  let chartData: { label: string; value: number }[] = []
+  try {
+    rows = JSON.parse(data.rowsJson || '[]')
+    chartData = JSON.parse(data.chartDataJson || '[]')
+  } catch {
+    rows = []
+    chartData = []
+  }
+
+  const type = widget.presentationType || 'Metric'
+
+  if (type === 'Metric') {
+    return (
+      <CustomMetricWidget
+        settings={settings}
+        aggregateLabel={data.aggregateLabel}
+        aggregateValue={data.aggregateValue}
+        clientsData={source === 'clientes' ? rows : []}
+        policiesData={source === 'polizas' ? rows : []}
+        casesData={source === 'casos' ? rows : []}
+      />
+    )
+  }
+
+  if (type === 'DataGrid') {
+    return (
+      <CustomDataGridWidget
+        settings={settings}
+        clientsData={source === 'clientes' ? rows : []}
+        policiesData={source === 'polizas' ? rows : []}
+        casesData={source === 'casos' ? rows : []}
+      />
+    )
+  }
+
+  if (type === 'List') {
+    return (
+      <CustomListWidget
+        settings={settings}
+        clientsData={source === 'clientes' ? rows : []}
+        policiesData={source === 'polizas' ? rows : []}
+        casesData={source === 'casos' ? rows : []}
+      />
+    )
+  }
+
+  if (rows.length === 0 && chartData.length === 0) {
+    return <EmptyWidgetState text="Sin datos para los filtros configurados." onConfigure={onConfigure} />
+  }
+
+  const translatedChartData = chartData.map((item) => ({
+    ...item,
+    label: getFieldDisplayValue(source, settings.groupByField ?? 'status', item.label),
+  }))
+
+  if (type === 'Pie Chart') {
+    return (
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
+        <PieChart
+          series={[{
+            data: translatedChartData.map((d, i) => ({ id: i, value: d.value, label: d.label })),
+            innerRadius: 25,
+            outerRadius: 60,
+            paddingAngle: 4,
+            cornerRadius: 4,
+            cx: 90,
+            cy: 75
+          }]}
+          width={280}
+          height={150}
+          slotProps={{
+            legend: {
+              direction: 'column' as any,
+              position: { vertical: 'middle' as const, horizontal: 'end' as const },
+            },
+          }}
+        />
+      </Box>
+    )
+  }
+
+  if (type === 'Bars Chart' || type === 'Bar Chart') {
+    return (
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
+        <BarChart
+          dataset={translatedChartData}
+          xAxis={[{ scaleType: 'band', dataKey: 'label', label: settings.xAxisLabel || undefined }]}
+          yAxis={[{ label: settings.yAxisLabel || undefined }]}
+          series={[{ dataKey: 'value', label: 'Cantidad', color: '#075985' }]}
+          width={280}
+          height={150}
+        />
+      </Box>
+    )
+  }
+
+  if (type === 'Line Chart') {
+    return (
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
+        <LineChart
+          dataset={translatedChartData}
+          xAxis={[{ scaleType: 'band', dataKey: 'label', label: settings.xAxisLabel || undefined }]}
+          yAxis={[{ label: settings.yAxisLabel || undefined }]}
+          series={[{ dataKey: 'value', label: 'Cantidad', color: '#0284c7' }]}
+          width={280}
+          height={150}
+        />
+      </Box>
+    )
+  }
+
+  if (type === 'Sparkline') {
+    return (
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
+        <SparkLineChart
+          data={translatedChartData.map((d) => d.value)}
+          width={280}
+          height={150}
+          showTooltip
+          showHighlight
+        />
+      </Box>
+    )
+  }
+
+  if (type === 'Scatter Chart') {
+    return (
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
+        <ScatterChart
+          xAxis={[{ label: settings.xAxisLabel || undefined }]}
+          yAxis={[{ label: settings.yAxisLabel || undefined }]}
+          series={[{
+            data: translatedChartData.map((d, i) => ({ x: i, y: d.value, id: i, label: d.label })),
+            color: '#0f766e'
+          }]}
+          width={280}
+          height={150}
+        />
+      </Box>
+    )
+  }
+
+  if (type === 'Radar Chart') {
+    return (
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
+        <CustomRadarChart
+          data={translatedChartData}
+          xAxisLabel={settings.xAxisLabel}
+          yAxisLabel={settings.yAxisLabel}
+        />
+      </Box>
+    )
+  }
+
+  if (type === 'Bubble Chart') {
+    return (
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
+        <CustomBubbleChart
+          data={translatedChartData}
+          xAxisLabel={settings.xAxisLabel}
+          yAxisLabel={settings.yAxisLabel}
+        />
+      </Box>
+    )
+  }
+
+  if (type === 'Gauge') {
+    const { value, label } = getGaugeValueAndLabel(source, rows)
+    return (
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
+        <Gauge
+          width={180}
+          height={120}
+          value={value}
+          innerRadius="70%"
+          outerRadius="100%"
+        />
+        <Typography variant="body2" sx={{ fontWeight: 600, mt: 1 }}>
+          {label} de registros activos
+        </Typography>
+      </Box>
+    )
+  }
+
+  return <EmptyWidgetState text="Tipo de widget no soportado o sin datos." onConfigure={onConfigure} />
 }
 
 function EmptyWidgetState({ text, onConfigure }: { text: string; onConfigure?: () => void }) {
@@ -1277,7 +1736,7 @@ function getGaugeValueAndLabel(source: string, rawData: any[]) {
   if (source === 'clientes') {
     activeCount = rawData.filter((c) => c.status === 'active').length
   } else if (source === 'polizas') {
-    activeCount = rawData.filter((p) => p.status === 'active' || p.status === 'active_policy' || p.status === 'vigente').length
+    activeCount = rawData.filter((p) => normalizeFilterValue('polizas', 'status', p.status) === 'active').length
   } else if (source === 'casos') {
     activeCount = rawData.filter((c) => c.status === 'closed' || c.status === 'completed').length
   }
@@ -1286,10 +1745,10 @@ function getGaugeValueAndLabel(source: string, rawData: any[]) {
 }
 
 export function DashboardPage() {
-  const { data, error, loading, refetch } = useApiQuery('dashboard-summary', fetchDashboardSummary)
+  const { data, error, loading } = useApiQuery('dashboard-summary', fetchDashboardSummary)
 
   // Load widgets catalog from DB
-  const { data: dbWidgets } = useApiQuery('widgets-catalog', fetchWidgets)
+  const { data: dbWidgets, loading: loadingWidgetsCatalog } = useApiQuery('widgets-catalog', fetchWidgets)
 
   // Compute widgetCatalog from dbWidgets dynamically
   const widgetCatalog = useMemo(() => {
@@ -1315,13 +1774,8 @@ export function DashboardPage() {
       })
   }, [dbWidgets])
 
-  // Loaded database records for custom dynamic widgets
-  const { data: clientsData } = useApiQuery('clients-list', fetchClients)
-  const { data: policiesData } = useApiQuery('policies-list', fetchPolicies)
-  const { data: casesData } = useApiQuery('cases-list', fetchCases)
-
   // Multiple persistent dashboards — start empty, loaded from DB on mount
-  const [dashboards, setDashboards] = useState<{ uuid?: string; name: string; config: DashboardConfig; isPrimary?: boolean }[]>([])
+  const [dashboards, setDashboards] = useState<DashboardRecord[]>([])
   const [currentDashboardName, setCurrentDashboardName] = useState<string>('General')
   const [loadingDashboards, setLoadingDashboards] = useState<boolean>(true)
 
@@ -1331,6 +1785,8 @@ export function DashboardPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [newDashboardName, setNewDashboardName] = useState('')
   const [renameDashboardName, setRenameDashboardName] = useState('')
+  const [newDashboardErrors, setNewDashboardErrors] = useState<DashboardNameErrors>({})
+  const [renameDashboardErrors, setRenameDashboardErrors] = useState<DashboardNameErrors>({})
 
   const currentDashboard = useMemo(() => {
     return dashboards.find((d) => d.name === currentDashboardName) || dashboards[0]
@@ -1346,8 +1802,10 @@ export function DashboardPage() {
 
   const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null)
   const [tempSettings, setTempSettings] = useState<WidgetSettings>({})
+  const [widgetSettingsErrors, setWidgetSettingsErrors] = useState<WidgetSettingsErrors>({})
   const [widgetIdToRemove, setWidgetIdToRemove] = useState<string | null>(null)
   const [speedDialOpen, setSpeedDialOpen] = useState(false)
+  const [widgetRefreshVersions, setWidgetRefreshVersions] = useState<Record<string, number>>({})
 
   const configuringWidget = useMemo(() => {
     if (!configuringWidgetId) return undefined
@@ -1372,7 +1830,7 @@ export function DashboardPage() {
       .then((data) => {
         if (data && data.length > 0) {
           const seen = new Set<string>()
-          const loaded: any[] = []
+          const loaded: DashboardRecord[] = []
           data.forEach((d) => {
             const normalized = d.name.toLowerCase().trim()
             if (!seen.has(normalized)) {
@@ -1386,15 +1844,16 @@ export function DashboardPage() {
               loaded.push({ uuid: d.uuid, name: d.name, config, isPrimary: d.isPrimary })
             }
           })
-          const primary = loaded.find((d) => d.isPrimary) ?? loaded[0]
-          setDashboards(loaded)
+          const normalizedDashboards = normalizeDashboards(loaded)
+          const primary = normalizedDashboards.find((d) => d.isPrimary) ?? normalizedDashboards[0]
+          setDashboards(normalizedDashboards)
           setCurrentDashboardName(primary.name)
         } else {
           // First login: create a clean empty "General" dashboard
           const emptyConfig: DashboardConfig = { visible: {}, layout: {}, settings: {}, instances: [] }
           saveUserDashboardApi('General', JSON.stringify(emptyConfig))
             .then((saved) => {
-              setDashboards([{ uuid: saved.uuid, name: 'General', config: emptyConfig, isPrimary: true }])
+              setDashboards(normalizeDashboards([{ uuid: saved.uuid, name: 'General', config: emptyConfig, isPrimary: saved.isPrimary }]))
               setCurrentDashboardName('General')
             })
             .catch(console.error)
@@ -1596,7 +2055,7 @@ export function DashboardPage() {
     setIsAddingDashboard(true)
     try {
       const saved = await saveUserDashboardApi(name, JSON.stringify(newConfig))
-      setDashboards((prev) => [...prev, { uuid: saved.uuid, name, config: newConfig }])
+      setDashboards((prev) => normalizeDashboards([...prev, { uuid: saved.uuid, name, config: newConfig, isPrimary: saved.isPrimary }]))
       setCurrentDashboardName(name)
       setIsAddDialogOpen(false)
       setNewDashboardName('')
@@ -1623,11 +2082,15 @@ export function DashboardPage() {
 
     setIsRenamingDashboard(true)
     try {
+      const wasPrimary = !!currentDashboard.isPrimary
       await saveUserDashboardApi(name, JSON.stringify(currentDashboard.config))
       await removeUserDashboardApi(currentDashboardName)
+      if (wasPrimary) {
+        await setPrimaryDashboardApi(name)
+      }
 
       setDashboards((prev) =>
-        prev.map((d) => (d.name === currentDashboardName ? { ...d, name } : d))
+        normalizeDashboards(prev.map((d) => (d.name === currentDashboardName ? { ...d, name, isPrimary: wasPrimary } : d)))
       )
       setCurrentDashboardName(name)
       setIsRenameDialogOpen(false)
@@ -1650,11 +2113,12 @@ export function DashboardPage() {
         // Last dashboard deleted — create a fresh empty one
         const emptyConfig: DashboardConfig = { visible: {}, layout: {}, settings: {}, instances: [] }
         const saved = await saveUserDashboardApi('General', JSON.stringify(emptyConfig))
-        setDashboards([{ uuid: saved.uuid, name: 'General', config: emptyConfig, isPrimary: true }])
+        setDashboards(normalizeDashboards([{ uuid: saved.uuid, name: 'General', config: emptyConfig, isPrimary: saved.isPrimary }]))
         setCurrentDashboardName('General')
       } else {
-        setDashboards(remaining)
-        setCurrentDashboardName(remaining[0].name)
+        const normalizedRemaining = normalizeDashboards(remaining)
+        setDashboards(normalizedRemaining)
+        setCurrentDashboardName((normalizedRemaining.find((d) => d.isPrimary) ?? normalizedRemaining[0]).name)
       }
       setIsDeleteDialogOpen(false)
       toast.success('Tablero eliminado exitosamente.')
@@ -1684,7 +2148,7 @@ export function DashboardPage() {
     try {
       await setPrimaryDashboardApi(currentDashboardName)
       setDashboards((prev) =>
-        prev.map((d) => ({ ...d, isPrimary: d.name === currentDashboardName }))
+        normalizeDashboards(prev.map((d) => ({ ...d, isPrimary: d.name === currentDashboardName })))
       )
       toast.success(`"${currentDashboardName}" es ahora tu tablero de inicio.`)
     } catch (err) {
@@ -1786,6 +2250,11 @@ export function DashboardPage() {
     )
 
     toast.success('Widget quitado del tablero.')
+    setWidgetRefreshVersions((current) => {
+      const next = { ...current }
+      delete next[instanceId]
+      return next
+    })
     setLayoutVersion((value) => value + 1)
   }
 
@@ -1834,7 +2303,7 @@ export function DashboardPage() {
     })
   }, [activeTab])
 
-  const renderWidget = (widget: WidgetDefinition, settings: WidgetSettings = {}, instanceId: string) => {
+  const renderWidget = (widget: WidgetDefinition, settings: WidgetSettings = {}, instanceId: string, refreshVersion = 0) => {
     if (loading || !data) {
       return <WidgetLoadingSkeleton presentationType={widget.presentationType} />
     }
@@ -1990,263 +2459,15 @@ export function DashboardPage() {
     if (type === 'SystemHealth') {
       return <CustomSystemHealthWidget />
     }
-    if (type === 'PremiumSummary') {
-      return <CustomPremiumSummaryWidget policiesData={policiesData ?? []} />
-    }
-
-    if (!settings.dataSource) {
-      return <CustomWidgetEmptyState title={widget.title} onConfigure={() => handleOpenConfigure(instanceId)} />
-    }
-
-    // Apply configured filters to raw data
-    const applyFilters = (data: any[]): any[] => {
-      if (!settings.filters || settings.filters.length === 0) return data
-      return data.filter((row: any) => {
-        return settings.filters!.every((filter: WidgetFilter) => {
-          const cellVal = String(row[filter.field] ?? '').toLowerCase()
-          const filterVal = (filter.value ?? '').toLowerCase()
-          switch (filter.operator) {
-            case 'eq': return cellVal === filterVal
-            case 'neq': return cellVal !== filterVal
-            case 'contains': return cellVal.includes(filterVal)
-            case 'not_contains': return !cellVal.includes(filterVal)
-            case 'gt': return Number(row[filter.field]) > Number(filter.value)
-            case 'lt': return Number(row[filter.field]) < Number(filter.value)
-            case 'is_null': return row[filter.field] == null || String(row[filter.field]).trim() === ''
-            case 'is_not_null': return row[filter.field] != null && String(row[filter.field]).trim() !== ''
-            default: return true
-          }
-        })
-      })
-    }
-
-    const filteredClients = applyFilters(clientsData ?? [])
-    const filteredPolicies = applyFilters(policiesData ?? [])
-    const filteredCases = applyFilters(casesData ?? [])
-
-    if (type === 'Metric' || type === 'Gauge') {
-      return (
-        <CustomMetricWidget
-          settings={settings}
-          clientsData={filteredClients}
-          policiesData={filteredPolicies}
-          casesData={filteredCases}
-        />
-      )
-    }
-    if (type === 'DataGrid') {
-      return (
-        <CustomDataGridWidget
-          settings={settings}
-          clientsData={filteredClients}
-          policiesData={filteredPolicies}
-          casesData={filteredCases}
-        />
-      )
-    }
-
-    const source = settings.dataSource ?? 'clientes'
-    const rawData =
-      source === 'clientes'
-        ? filteredClients
-        : source === 'polizas'
-          ? filteredPolicies
-          : filteredCases
-
-    if (!rawData || rawData.length === 0) {
-      return <EmptyWidgetState text="Sin datos para los filtros configurados." onConfigure={() => handleOpenConfigure(instanceId)} />
-    }
-
-    const groupBy = settings.groupByField ?? 'status'
-    const counts: Record<string, number> = {}
-    rawData.forEach((item: any) => {
-      const rawKey = String(item[groupBy] || 'Sin valor')
-      let key = rawKey
-      const normalized = rawKey.toLowerCase().replace(/_/g, '').trim()
-      if (normalized === 'active' || normalized === 'activepolicy' || normalized === 'vigente') {
-        key = source === 'polizas' ? 'Vigente' : 'Activo'
-      } else if (normalized === 'suspended') {
-        key = 'Suspendido'
-      } else if (normalized === 'invited') {
-        key = 'Invitado'
-      } else if (normalized === 'pending') {
-        key = 'Pendiente'
-      } else if (normalized === 'pendingrenewal') {
-        key = 'Renovación Pendiente'
-      } else if (normalized === 'expired' || normalized === 'vencida') {
-        key = 'Vencido'
-      } else if (normalized === 'cancelled') {
-        key = 'Cancelado'
-      } else if (normalized === 'inprogress') {
-        key = 'En Proceso'
-      } else if (normalized === 'closed' || normalized === 'completed') {
-        key = 'Completado'
-      } else if (normalized === 'waitingforclient') {
-        key = 'Esperando Cliente'
-      } else if (normalized === 'waitingforprovider') {
-        key = 'Esperando Proveedor'
-      } else if (normalized === 'draft' || normalized === 'borrador') {
-        key = 'Borrador'
-      } else if (normalized === 'individual') {
-        key = 'Individual'
-      } else if (normalized === 'corporate') {
-        key = 'Corporativo'
-      } else if (normalized === 'claim') {
-        key = 'Reclamo'
-      } else if (normalized === 'inquiry') {
-        key = 'Consulta'
-      } else if (normalized === 'billing') {
-        key = 'Facturación'
-      } else if (normalized === 'support') {
-        key = 'Soporte'
-      } else if (normalized === 'urgent') {
-        key = 'Urgente'
-      } else if (normalized === 'high') {
-        key = 'Alta'
-      } else if (normalized === 'medium') {
-        key = 'Media'
-      } else if (normalized === 'low') {
-        key = 'Baja'
-      }
-
-      counts[key] = (counts[key] || 0) + 1
-    })
-
-    const chartData = Object.entries(counts).map(([label, value]) => ({
-      label,
-      value,
-    }))
-
-    if (type === 'Pie Chart') {
-      return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
-          <PieChart
-            series={[{
-              data: chartData.map((d, i) => ({ id: i, value: d.value, label: d.label })),
-              innerRadius: 25,
-              outerRadius: 60,
-              paddingAngle: 4,
-              cornerRadius: 4,
-              cx: 90,
-              cy: 75
-            }]}
-            width={280}
-            height={150}
-            slotProps={{
-              legend: {
-                direction: 'column' as any,
-                position: { vertical: 'middle' as const, horizontal: 'end' as const },
-              },
-            }}
-          />
-        </Box>
-      )
-    }
-
-    if (type === 'Bars Chart' || type === 'Bar Chart') {
-      return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
-          <BarChart
-            dataset={chartData}
-            xAxis={[{ scaleType: 'band', dataKey: 'label', label: settings.xAxisLabel || undefined }]}
-            yAxis={[{ label: settings.yAxisLabel || undefined }]}
-            series={[{ dataKey: 'value', label: 'Cantidad', color: '#075985' }]}
-            width={280}
-            height={150}
-          />
-        </Box>
-      )
-    }
-
-    if (type === 'Line Chart') {
-      return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
-          <LineChart
-            dataset={chartData}
-            xAxis={[{ scaleType: 'band', dataKey: 'label', label: settings.xAxisLabel || undefined }]}
-            yAxis={[{ label: settings.yAxisLabel || undefined }]}
-            series={[{ dataKey: 'value', label: 'Cantidad', color: '#0284c7' }]}
-            width={280}
-            height={150}
-          />
-        </Box>
-      )
-    }
-
-    if (type === 'Sparkline') {
-      return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
-          <SparkLineChart
-            data={chartData.map((d) => d.value)}
-            width={280}
-            height={150}
-            showTooltip
-            showHighlight
-          />
-        </Box>
-      )
-    }
-
-    if (type === 'Scatter Chart') {
-      return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
-          <ScatterChart
-            xAxis={[{ label: settings.xAxisLabel || undefined }]}
-            yAxis={[{ label: settings.yAxisLabel || undefined }]}
-            series={[{
-              data: chartData.map((d, i) => ({ x: i, y: d.value, id: i, label: d.label })),
-              color: '#0f766e'
-            }]}
-            width={280}
-            height={150}
-          />
-        </Box>
-      )
-    }
-
-    if (type === 'Radar Chart') {
-      return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
-          <CustomRadarChart
-            data={chartData}
-            xAxisLabel={settings.xAxisLabel}
-            yAxisLabel={settings.yAxisLabel}
-          />
-        </Box>
-      )
-    }
-
-    if (type === 'Bubble Chart') {
-      return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
-          <CustomBubbleChart
-            data={chartData}
-            xAxisLabel={settings.xAxisLabel}
-            yAxisLabel={settings.yAxisLabel}
-          />
-        </Box>
-      )
-    }
-
-    if (type === 'Gauge') {
-      const { value, label } = getGaugeValueAndLabel(source, rawData)
-      return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 160 }}>
-          <Gauge
-            width={180}
-            height={120}
-            value={value}
-            innerRadius="70%"
-            outerRadius="100%"
-          />
-          <Typography variant="body2" sx={{ fontWeight: 600, mt: 1 }}>
-            {label} de registros activos
-          </Typography>
-        </Box>
-      )
-    }
-
-    return <EmptyWidgetState text="Tipo de widget no soportado o sin datos." />
+    return (
+      <DynamicWidgetContent
+        widget={widget}
+        settings={settings}
+        instanceId={instanceId}
+        refreshVersion={refreshVersion}
+        onConfigure={() => handleOpenConfigure(instanceId)}
+      />
+    )
   }
 
   const speedDialActions = useMemo(() => {
@@ -2333,6 +2554,8 @@ export function DashboardPage() {
     }
   }, [customizeMode, currentDashboard, currentDashboardName, dashboards.length, handleSetPrimary, isSettingPrimary])
 
+  const dashboardContentLoading = loadingDashboards || loadingWidgetsCatalog || !data || !currentDashboard
+
   if (loading && !data) {
     return <DashboardSkeleton />
   }
@@ -2347,7 +2570,6 @@ export function DashboardPage() {
           background: (theme) => theme.palette.mode === 'dark'
             ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)'
             : 'linear-gradient(135deg, rgba(239, 246, 255, 0.5) 0%, rgba(243, 244, 246, 0.6) 100%)',
-          backdropFilter: 'blur(16px)',
           border: (theme) => theme.palette.mode === 'dark'
             ? '1px solid rgba(255, 255, 255, 0.08)'
             : '1px solid rgba(0, 0, 0, 0.08)',
@@ -2469,47 +2691,6 @@ export function DashboardPage() {
                 )}
               </Stack>
 
-              <Tooltip title="Actualizar datos del panel">
-                <span>
-                  <Button
-                    variant="outlined"
-                    onClick={refetch}
-                    disabled={loading}
-                    sx={{
-                      bgcolor: 'background.paper',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      color: 'text.primary',
-                      borderRadius: 2.5,
-                      px: 2.5,
-                      py: 1,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      fontSize: '0.85rem',
-                      boxShadow: 'none',
-                      transition: 'all 0.2s',
-                      '&:hover': {
-                        bgcolor: 'action.hover',
-                        borderColor: 'divider',
-                        boxShadow: 'none',
-                      },
-                      '&:disabled': {
-                        bgcolor: 'action.disabledBackground',
-                        color: 'text.disabled',
-                      }
-                    }}
-                    startIcon={
-                      loading ? (
-                        <CircularProgress size={14} color="inherit" />
-                      ) : (
-                        <RefreshCcw size={14} />
-                      )
-                    }
-                  >
-                    Actualizar
-                  </Button>
-                </span>
-              </Tooltip>
             </Stack>
           </Grid>
         </Grid>
@@ -2591,7 +2772,34 @@ export function DashboardPage() {
         </Box>
       )}
 
-      {data && activeWidgetInstances.length === 0 ? (
+      {dashboardContentLoading ? (
+        <Box className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Box
+              key={index}
+              className="rounded-lg border border-[var(--himalaya-border)] bg-[var(--himalaya-surface)] p-5 shadow-[var(--himalaya-shadow)]"
+              sx={{ minHeight: 220 }}
+            >
+              <Stack spacing={2}>
+                <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', flex: 1 }}>
+                    <Skeleton variant="rounded" width={40} height={40} />
+                    <Stack spacing={0.75} sx={{ flex: 1 }}>
+                      <Skeleton variant="text" width="60%" height={22} />
+                      <Skeleton variant="text" width="42%" height={16} />
+                    </Stack>
+                  </Stack>
+                </Stack>
+                <Skeleton variant="rounded" width="100%" height={116} />
+                <Stack direction="row" spacing={1}>
+                  <Skeleton variant="text" width="35%" height={18} />
+                  <Skeleton variant="text" width="24%" height={18} />
+                </Stack>
+              </Stack>
+            </Box>
+          ))}
+        </Box>
+      ) : activeWidgetInstances.length === 0 ? (
         <Box
           sx={{
             display: 'flex',
@@ -2658,6 +2866,7 @@ export function DashboardPage() {
             const layout = layoutRef.current[inst.id] ?? widget.defaultLayout
             const settings = widgetSettings[inst.id] ?? {}
             const title = settings.title || widget.title
+            const isDynamicDataWidget = !['Shortcuts', 'Security', 'SystemHealth', 'shortcuts', 'securityOverview'].includes(widget.presentationType ?? '')
 
             const gridItemProps = {
               className: 'grid-stack-item',
@@ -2680,8 +2889,14 @@ export function DashboardPage() {
                     editing={customizeMode}
                     onConfigure={() => handleOpenConfigure(inst.id)}
                     onRemove={() => setWidgetIdToRemove(inst.id)}
+                    onRefresh={isDynamicDataWidget ? () => {
+                      setWidgetRefreshVersions((current) => ({
+                        ...current,
+                        [inst.id]: (current[inst.id] ?? 0) + 1,
+                      }))
+                    } : undefined}
                   >
-                    {renderWidget(widget, settings, inst.id)}
+                    {renderWidget(widget, settings, inst.id, widgetRefreshVersions[inst.id] ?? 0)}
                   </WidgetShell>
                 </div>
               </div>
@@ -2691,11 +2906,29 @@ export function DashboardPage() {
       )}
 
       {/* Widget Library Modal */}
-      <Dialog open={widgetsOpen} onClose={() => setWidgetsOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Librería de Widgets</DialogTitle>
-        <DialogContent dividers>
+      <Dialog
+        open={widgetsOpen}
+        onClose={() => setWidgetsOpen(false)}
+        maxWidth="md"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 3,
+              overflow: 'hidden',
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 850, letterSpacing: 0, pb: 1 }}>
+          Librería de Widgets
+        </DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: 'background.default' }}>
           <Stack spacing={2.5}>
-            <Typography color="text.secondary">
+            <Typography color="text.secondary" sx={{ fontSize: '0.92rem' }}>
               Activa y configura los widgets disponibles para estructurar tu panel operativo ideal.
             </Typography>
 
@@ -2713,7 +2946,7 @@ export function DashboardPage() {
               <Tab label="Seguridad" value="security" />
             </Tabs>
 
-            <Stack spacing={2}>
+            <Stack spacing={1.75}>
               {filteredCatalog.map((widget) => {
                 const available = availableWidgetIds.has(widget.id)
                 const instanceCount = activeWidgetInstances.filter((inst) => inst.widgetId === widget.id).length
@@ -2725,27 +2958,30 @@ export function DashboardPage() {
                       border: '1px solid',
                       borderColor: 'divider',
                       borderRadius: 3,
-                      p: 2,
+                      p: 2.25,
                       opacity: available ? 1 : 0.58,
-                      backgroundColor: 'background.paper',
-                      transition: 'box-shadow 0.2s',
+                      bgcolor: 'background.paper',
+                      boxShadow: 1,
+                      transition: 'box-shadow 0.2s, border-color 0.2s, transform 0.2s',
                       '&:hover': {
-                        boxShadow: 'var(--himalaya-shadow)',
+                        transform: available ? 'translateY(-1px)' : 'none',
+                        borderColor: 'primary.main',
+                        boxShadow: 3,
                       }
                     }}
                   >
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2 }}>
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start', flex: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0, borderRadius: 2, overflow: 'hidden' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0, borderRadius: 3, overflow: 'hidden' }}>
                           {renderWidgetMiniPreview(widget.presentationType)}
                         </Box>
                         <Box>
                           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.75, mb: 0.5 }}>
                             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{widget.title}</Typography>
-                            <Chip size="small" label={widget.category} variant="outlined" />
+                            <Chip size="small" label={widget.category} variant="outlined" sx={{ borderRadius: 99 }} />
                             {!available && <Chip size="small" color="warning" variant="outlined" label="No disponible para este perfil" />}
                           </Stack>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.55 }}>
                             {widget.description}
                           </Typography>
                         </Box>
@@ -2763,7 +2999,7 @@ export function DashboardPage() {
                           disabled={!available}
                           startIcon={<Plus size={15} />}
                           onClick={() => addWidgetInstance(widget.id)}
-                          sx={{ textTransform: 'none' }}
+                          sx={{ textTransform: 'none', borderRadius: 99, px: 2 }}
                         >
                           Agregar
                         </Button>
@@ -2821,7 +3057,7 @@ export function DashboardPage() {
               />
 
               {/* ─── Origen de datos — shown for all non-fixed widgets ─── */}
-              {configuringWidget?.presentationType && !['Shortcuts', 'Security', 'SystemHealth', 'PremiumSummary', 'shortcuts', 'securityOverview'].includes(configuringWidget.presentationType) && (
+              {configuringWidget?.presentationType && !['Shortcuts', 'Security', 'SystemHealth', 'shortcuts', 'securityOverview'].includes(configuringWidget.presentationType) && (
                 <FormControl fullWidth size="small">
                   <InputLabel>Origen de datos</InputLabel>
                   <Select
@@ -2833,6 +3069,9 @@ export function DashboardPage() {
                         ...tempSettings,
                         dataSource: newSource,
                         groupByField: 'status',
+                        aggregateFunction: 'count',
+                        aggregateField: '',
+                        daysWindow: 30,
                         fieldsToShow: newSource === 'clientes'
                           ? ['displayName', 'type', 'status']
                           : newSource === 'polizas'
@@ -2871,7 +3110,7 @@ export function DashboardPage() {
                         { value: 'type', label: 'Tipo de Caso' }
                       ] : [
                         { value: 'status', label: 'Estado de Cuenta' },
-                        { value: 'type', label: 'Tipo (Individual/Corporativo)' },
+                        { value: 'type', label: 'Tipo de cliente' },
                         { value: 'department', label: 'Departamento' }
                       ]).map((opt) => (
                         <MenuItem key={opt.value} value={opt.value}>
@@ -2939,6 +3178,86 @@ export function DashboardPage() {
               {/* ─── Metric / Gauge: color ─── */}
               {configuringWidget?.presentationType && (
                 configuringWidget.presentationType === 'Metric' ||
+                configuringWidget.presentationType === 'Gauge' ||
+                configuringWidget.presentationType.includes('Chart') ||
+                configuringWidget.presentationType === 'Sparkline'
+              ) && tempSettings.dataSource && (
+                  <Stack spacing={1.5}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Funcion a calcular</InputLabel>
+                      <Select
+                        label="Funcion a calcular"
+                        value={tempSettings.aggregateFunction ?? 'count'}
+                        onChange={(e) => {
+                          const nextFunction = e.target.value
+                          const numericFields = NUMERIC_FIELDS_BY_SOURCE[tempSettings.dataSource ?? ''] ?? []
+                          setTempSettings({
+                            ...tempSettings,
+                            aggregateFunction: nextFunction,
+                            aggregateField: AGGREGATE_FIELD_REQUIRED.has(nextFunction)
+                              ? (numericFields[0]?.key ?? '')
+                              : tempSettings.aggregateField,
+                            daysWindow: AGGREGATE_WINDOW_FUNCTIONS.has(nextFunction) ? (tempSettings.daysWindow ?? 30) : tempSettings.daysWindow,
+                          })
+                        }}
+                      >
+                        {AGGREGATE_FUNCTIONS.map((fn) => (
+                          <MenuItem key={fn.value} value={fn.value}>
+                            <Stack spacing={0.25}>
+                              <Typography variant="body2">{fn.label}</Typography>
+                              <Typography variant="caption" color="text.secondary">{fn.description}</Typography>
+                            </Stack>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    {(AGGREGATE_FIELD_REQUIRED.has(tempSettings.aggregateFunction ?? 'count') || AGGREGATE_FIELD_OPTIONAL.has(tempSettings.aggregateFunction ?? 'count')) && (
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Campo de calculo</InputLabel>
+                        <Select
+                          label="Campo de calculo"
+                          value={tempSettings.aggregateField ?? ''}
+                          onChange={(e) => setTempSettings({ ...tempSettings, aggregateField: e.target.value })}
+                        >
+                          {AGGREGATE_FIELD_REQUIRED.has(tempSettings.aggregateFunction ?? 'count')
+                            ? (NUMERIC_FIELDS_BY_SOURCE[tempSettings.dataSource ?? ''] ?? []).map((field) => (
+                              <MenuItem key={field.key} value={field.key}>{field.label}</MenuItem>
+                            ))
+                            : (tempSettings.dataSource === 'polizas'
+                              ? POLICY_FIELDS
+                              : tempSettings.dataSource === 'casos'
+                                ? CASE_FIELDS
+                                : CLIENT_FIELDS
+                            ).map((field) => (
+                              <MenuItem key={field.key} value={field.key}>{field.label}</MenuItem>
+                            ))}
+                        </Select>
+                      </FormControl>
+                    )}
+
+                    {AGGREGATE_WINDOW_FUNCTIONS.has(tempSettings.aggregateFunction ?? 'count') && (
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Ventana de dias ({tempSettings.daysWindow ?? 30})
+                        </Typography>
+                        <Slider
+                          value={tempSettings.daysWindow ?? 30}
+                          min={7}
+                          max={120}
+                          step={1}
+                          marks={[{ value: 7, label: '7' }, { value: 30, label: '30' }, { value: 60, label: '60' }, { value: 120, label: '120' }]}
+                          valueLabelDisplay="auto"
+                          onChange={(_, val) => setTempSettings({ ...tempSettings, daysWindow: val as number })}
+                        />
+                      </Box>
+                    )}
+                  </Stack>
+                )}
+
+              {/* â”€â”€â”€ Metric / Gauge: color â”€â”€â”€ */}
+              {configuringWidget?.presentationType && (
+                configuringWidget.presentationType === 'Metric' ||
                 configuringWidget.presentationType === 'Gauge'
               ) && (
                   <FormControl fullWidth size="small">
@@ -2971,7 +3290,7 @@ export function DashboardPage() {
                         ...tempSettings,
                         filters: [
                           ...(tempSettings.filters ?? []),
-                          { field: tempSettings.dataSource === 'polizas' ? 'status' : 'status', operator: 'eq', value: '' }
+                          { field: 'status', operator: 'eq', value: getDefaultFilterValue(tempSettings.dataSource ?? '', 'status') }
                         ]
                       })}
                       sx={{ textTransform: 'none' }}
@@ -2995,6 +3314,7 @@ export function DashboardPage() {
 
                       const options = getFilterFieldOptions(tempSettings.dataSource ?? '', filter.field)
                       const isNullOperator = filter.operator === 'is_null' || filter.operator === 'is_not_null'
+                      const isDateField = isDateFilterField(filter.field)
 
                       return (
                         <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -3006,9 +3326,13 @@ export function DashboardPage() {
                               onChange={(e) => {
                                 const newField = e.target.value
                                 const updated = [...(tempSettings.filters ?? [])]
-                                const fieldOptions = getFilterFieldOptions(tempSettings.dataSource ?? '', newField)
-                                const defaultValue = fieldOptions ? fieldOptions[0].value : ''
-                                updated[idx] = { ...updated[idx], field: newField, value: defaultValue }
+                                const nextOperator = isDateFilterField(newField) ? 'gt' : 'eq'
+                                updated[idx] = {
+                                  ...updated[idx],
+                                  field: newField,
+                                  operator: nextOperator,
+                                  value: getDefaultFilterValue(tempSettings.dataSource ?? '', newField)
+                                }
                                 setTempSettings({ ...tempSettings, filters: updated })
                               }}
                             >
@@ -3037,8 +3361,8 @@ export function DashboardPage() {
                             >
                               <MenuItem value="eq">Igual a</MenuItem>
                               <MenuItem value="neq">Diferente de</MenuItem>
-                              <MenuItem value="contains">Contiene</MenuItem>
-                              <MenuItem value="not_contains">No contiene</MenuItem>
+                              {!isDateField && <MenuItem value="contains">Contiene</MenuItem>}
+                              {!isDateField && <MenuItem value="not_contains">No contiene</MenuItem>}
                               <MenuItem value="gt">Mayor que</MenuItem>
                               <MenuItem value="lt">Menor que</MenuItem>
                               <MenuItem value="is_null">Es nulo / vacío</MenuItem>
@@ -3055,12 +3379,35 @@ export function DashboardPage() {
                               placeholder="No requiere"
                               sx={{ flex: 1 }}
                             />
+                          ) : isDateField ? (
+                            <DatePicker
+                              label="Valor"
+                              value={filter.value ? dayjs(filter.value) : null}
+                              onChange={(newValue) => {
+                                const updated = [...(tempSettings.filters ?? [])]
+                                updated[idx] = {
+                                  ...updated[idx],
+                                  value: newValue?.isValid() ? newValue.startOf('day').toISOString() : ''
+                                }
+                                setTempSettings({ ...tempSettings, filters: updated })
+                              }}
+                              format="DD/MM/YYYY"
+                              slotProps={{
+                                field: {
+                                  readOnly: true,
+                                },
+                                textField: {
+                                  size: 'small',
+                                  sx: { flex: 1 },
+                                },
+                              }}
+                            />
                           ) : options ? (
                             <FormControl size="small" sx={{ flex: 1 }}>
                               <InputLabel>Valor</InputLabel>
                               <Select
                                 label="Valor"
-                                value={filter.value}
+                                value={normalizeFilterValue(tempSettings.dataSource ?? '', filter.field, filter.value)}
                                 onChange={(e) => {
                                   const updated = [...(tempSettings.filters ?? [])]
                                   updated[idx] = { ...updated[idx], value: e.target.value }
@@ -3134,8 +3481,7 @@ export function DashboardPage() {
 
               {/* Limit for list-type widgets */}
               {configuringWidget?.presentationType && (
-                configuringWidget.presentationType === 'renewals' ||
-                configuringWidget.presentationType === 'followUps'
+                configuringWidget.presentationType === 'List'
               ) && (
                   <Box>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -3485,20 +3831,69 @@ const CASE_FIELDS = [
   { key: 'dueAt', label: 'Fecha Vence' },
 ]
 
+const AGGREGATE_FUNCTIONS = [
+  { value: 'count', label: 'Cantidad de registros', description: 'Cuenta todo lo que cumpla los filtros' },
+  { value: 'sum', label: 'Suma', description: 'Suma un campo numerico' },
+  { value: 'avg', label: 'Promedio', description: 'Promedia un campo numerico' },
+  { value: 'min', label: 'Valor minimo', description: 'Menor valor de un campo numerico' },
+  { value: 'max', label: 'Valor maximo', description: 'Mayor valor de un campo numerico' },
+  { value: 'distinct_count', label: 'Valores unicos', description: 'Cuenta valores distintos de un campo' },
+  { value: 'active_count', label: 'Activos / vigentes', description: 'Clientes activos, polizas vigentes o casos activos' },
+  { value: 'inactive_count', label: 'Inactivos / prospectos', description: 'Clientes no activos' },
+  { value: 'expired_count', label: 'Vencidos', description: 'Polizas vencidas' },
+  { value: 'cancelled_count', label: 'Cancelados', description: 'Registros cancelados' },
+  { value: 'open_count', label: 'Abiertos', description: 'Casos o registros no cerrados' },
+  { value: 'closed_count', label: 'Cerrados', description: 'Registros completados' },
+  { value: 'overdue_count', label: 'Atrasados por fecha', description: 'Vencidos segun fecha limite' },
+  { value: 'due_soon_count', label: 'Proximos a vencer', description: 'Vencen dentro de una ventana de dias' },
+  { value: 'renewal_due_count', label: 'Renovaciones proximas', description: 'Polizas vigentes o por renovar dentro de la ventana' },
+  { value: 'active_rate', label: 'Porcentaje activo', description: 'Activos sobre el total filtrado' },
+  { value: 'expiration_rate', label: 'Porcentaje vencido', description: 'Vencidos sobre el total filtrado' },
+  { value: 'conversion_rate', label: 'Tasa de conversion', description: 'Activos sobre total filtrado' },
+]
+
+const NUMERIC_FIELDS_BY_SOURCE: Record<string, Array<{ key: string; label: string }>> = {
+  clientes: [],
+  polizas: [
+    { key: 'premiumAmount', label: 'Prima' },
+    { key: 'insuredAmount', label: 'Monto asegurado' },
+  ],
+  casos: [],
+}
+
+const AGGREGATE_FIELD_REQUIRED = new Set(['sum', 'avg', 'min', 'max'])
+const AGGREGATE_FIELD_OPTIONAL = new Set(['distinct_count'])
+const AGGREGATE_WINDOW_FUNCTIONS = new Set(['due_soon_count', 'renewal_due_count'])
+
+const DATE_FILTER_FIELDS = new Set(['startDate', 'endDate', 'dueAt'])
+
+function isDateFilterField(field: string) {
+  return DATE_FILTER_FIELDS.has(field)
+}
+
+function getDefaultFilterValue(dataSource: string, field: string) {
+  const options = getFilterFieldOptions(dataSource, field)
+  if (options) return options[0].value
+  if (isDateFilterField(field)) return dayjs().startOf('day').toISOString()
+  return ''
+}
+
 const getFilterFieldOptions = (dataSource: string, field: string) => {
   if (field === 'status') {
     if (dataSource === 'clientes') {
       return [
         { value: 'active', label: 'Activo' },
-        { value: 'suspended', label: 'Suspendido' },
-        { value: 'invited', label: 'Invitado' },
+        { value: 'inactive', label: 'Inactivo' },
+        { value: 'prospect', label: 'Prospecto' },
       ]
     }
     if (dataSource === 'polizas') {
       return [
-        { value: 'active_policy', label: 'Vigente' },
+        { value: 'active', label: 'Vigente' },
+        { value: 'draft', label: 'Borrador' },
+        { value: 'pending_renewal', label: 'Pendiente de renovación' },
+        { value: 'expired', label: 'Vencida' },
         { value: 'cancelled', label: 'Cancelado' },
-        { value: 'pending', label: 'Pendiente' },
       ]
     }
     if (dataSource === 'casos') {
@@ -3523,16 +3918,18 @@ const getFilterFieldOptions = (dataSource: string, field: string) => {
   if (field === 'type') {
     if (dataSource === 'clientes') {
       return [
-        { value: 'individual', label: 'Individual' },
-        { value: 'corporate', label: 'Corporativo' },
+        { value: 'individual', label: 'Persona individual' },
+        { value: 'company', label: 'Empresa' },
       ]
     }
     if (dataSource === 'casos') {
       return [
         { value: 'claim', label: 'Reclamo' },
-        { value: 'inquiry', label: 'Consulta' },
-        { value: 'billing', label: 'Facturación' },
-        { value: 'support', label: 'Soporte' },
+        { value: 'renewal', label: 'Renovación' },
+        { value: 'endorsement', label: 'Endoso' },
+        { value: 'payment', label: 'Pago' },
+        { value: 'documentation', label: 'Documentación' },
+        { value: 'general_support', label: 'Soporte general' },
       ]
     }
   }

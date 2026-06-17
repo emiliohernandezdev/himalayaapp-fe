@@ -499,3 +499,29 @@ export function fetchSystemHealth() {
   return graphqlRequest<{ systemHealth: SystemHealthDto }>(graphqlOperationIds.systemHealth).then((data) => data.systemHealth)
 }
 
+export type DashboardWidgetDataInput = {
+  dataSource: 'clientes' | 'polizas' | 'casos'
+  fieldsToShow?: string[]
+  filtersJson?: string | null
+  groupByField?: string | null
+  aggregateFunction?: string | null
+  aggregateField?: string | null
+  daysWindow?: number | null
+  limit?: number | null
+}
+
+export type DashboardWidgetDataDto = {
+  dataSource: string
+  totalRows: number
+  aggregateLabel: string
+  aggregateValue: string
+  rowsJson: string
+  chartDataJson: string
+}
+
+export function fetchDashboardWidgetData(input: DashboardWidgetDataInput) {
+  return graphqlRequest<{ dashboardWidgetData: DashboardWidgetDataDto }>(
+    graphqlOperationIds.dashboardWidgetData,
+    { input },
+  ).then((data) => data.dashboardWidgetData)
+}

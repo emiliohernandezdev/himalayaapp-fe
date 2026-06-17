@@ -3,6 +3,7 @@ import type { GridColDef } from '@mui/x-data-grid'
 import { Edit2, MoreVertical, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import * as z from 'zod'
 import { createSecurityRole, fetchSecurityRoles, removeSecurityRole, updateSecurityRole } from '../../api/securityApi'
 import type { SecurityRole } from '../../api/securityApi'
 import { useApiQuery } from '../../api/useApiQuery'
@@ -11,6 +12,22 @@ import { ResponsiveDataGrid } from '../../components/ResponsiveDataGrid'
 import { esESGrid } from '../../utils/enumLabels'
 
 const emptyForm = { code: '', name: '', description: '', hierarchy: 10, elevated: false, enabled: true }
+
+const roleSchema = z.object({
+  code: z.string()
+    .trim()
+    .min(2, 'El codigo debe tener al menos 2 caracteres.')
+    .max(50, 'El codigo es demasiado largo.')
+    .regex(/^[a-z][a-z0-9_]*$/, 'Usa minusculas, numeros y guion bajo; debe iniciar con letra.'),
+  name: z.string().trim().min(2, 'El nombre debe tener al menos 2 caracteres.').max(80, 'El nombre es demasiado largo.'),
+  description: z.string().trim().max(240, 'La descripcion no puede superar 240 caracteres.').optional(),
+  hierarchy: z.coerce.number().int('La jerarquia debe ser un numero entero.').min(0, 'Minimo 0.').max(100, 'Maximo 100.'),
+  elevated: z.boolean(),
+  enabled: z.boolean(),
+})
+
+type RoleForm = z.infer<typeof roleSchema>
+type RoleFormErrors = Partial<Record<keyof RoleForm, string>>
 
 export function RolesPage() {
   const { data, loading, refetch } = useApiQuery('security-roles', fetchSecurityRoles)
@@ -22,17 +39,20 @@ export function RolesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [form, setForm] = useState<any>(emptyForm)
+  const [form, setForm] = useState<RoleForm>(emptyForm)
+  const [formErrors, setFormErrors] = useState<RoleFormErrors>({})
 
   const openCreate = () => {
     setDialogMode('create')
     setForm(emptyForm)
+    setFormErrors({})
     setDialogOpen(true)
   }
 
   const openEdit = (role: SecurityRole) => {
     setDialogMode('edit')
     setForm({ code: role.code, name: role.name, description: role.description, hierarchy: role.hierarchy, elevated: role.elevated, enabled: role.enabled })
+    setFormErrors({})
     setDialogOpen(true)
     setAnchorEl(null)
   }
@@ -43,13 +63,25 @@ export function RolesPage() {
   }
 
   const save = async () => {
+    const parsed = roleSchema.safeParse(form)
+    if (!parsed.success) {
+      const nextErrors: RoleFormErrors = {}
+      parsed.error.issues.forEach((issue) => {
+        const field = issue.path[0] as keyof RoleForm | undefined
+        if (field) nextErrors[field] = issue.message
+      })
+      setFormErrors(nextErrors)
+      return
+    }
+
     setIsSaving(true)
     try {
+      setFormErrors({})
       if (dialogMode === 'create') {
-        await createSecurityRole(form)
+        await createSecurityRole(parsed.data)
         toast.success('Rol creado exitosamente')
       } else if (selected) {
-        await updateSecurityRole({ ...form, code: selected.code })
+        await updateSecurityRole({ ...parsed.data, code: selected.code })
         toast.success('Rol actualizado')
       }
       setDialogOpen(false)
@@ -173,11 +205,12 @@ export function RolesPage() {
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value.toLowerCase().replace(/\s/g, '_') })}
                 fullWidth
-                helperText="Ej: auditor_senior, operaciones_gt"
+                error={!!formErrors.code}
+                helperText={formErrors.code ?? 'Ej: auditor_senior, operaciones_gt'}
                 slotProps={{ htmlInput: { style: { fontFamily: 'monospace' } } }}
               />
             )}
-            <TextField label="Nombre visible" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} fullWidth />
+            <TextField label="Nombre visible" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} fullWidth error={!!formErrors.name} helperText={formErrors.name ?? 'Nombre que veran los administradores.'} />
             <TextField label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} fullWidth multiline rows={2} />
             <Stack direction="row" spacing={2}>
               <TextField

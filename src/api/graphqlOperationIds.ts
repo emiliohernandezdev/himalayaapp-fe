@@ -54,6 +54,7 @@ export const graphqlOperationIds = {
   removeWidget: 'aa00100100100123',
   setPrimaryDashboard: 'aa00100100100124',
   systemHealth: 'aa00100100100125',
+  dashboardWidgetData: 'aa00100100100126',
 } as const
 
 export type GraphqlOperationId =

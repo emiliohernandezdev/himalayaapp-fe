@@ -158,6 +158,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
 
   const allowedModules = useMemo(() => {
     return modules.filter((module) => {
+      if (module.slug === 'dashboard') return true
       if (module.slug === 'providers') return canViewProviders
       if (module.slug === 'clients') return canViewClients
       if (module.slug === 'products') return canViewProducts
