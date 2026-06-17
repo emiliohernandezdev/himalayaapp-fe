@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { sessionExpiredMessage } from './graphqlClient'
 
 export function useApiQuery<TData>(queryKey: string, queryFn: () => Promise<TData>) {
   const [data, setData] = useState<TData | null>(null)
@@ -6,7 +7,7 @@ export function useApiQuery<TData>(queryKey: string, queryFn: () => Promise<TDat
   const [loading, setLoading] = useState(true)
   const [tick, setTick] = useState(0)
 
-  const refetch = useCallback(() => setTick((t) => t + 1), [])
+  const refetch = useCallback(() => setTick((value) => value + 1), [])
 
   useEffect(() => {
     let active = true
@@ -19,7 +20,9 @@ export function useApiQuery<TData>(queryKey: string, queryFn: () => Promise<TDat
         if (active) setData(nextData)
       })
       .catch((nextError: Error) => {
-        if (active) setError(nextError)
+        if (active && nextError.message !== sessionExpiredMessage) {
+          setError(nextError)
+        }
       })
       .finally(() => {
         if (active) setLoading(false)

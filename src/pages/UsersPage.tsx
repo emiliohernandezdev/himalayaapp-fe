@@ -73,13 +73,8 @@ export function UsersPage() {
       valueOptions: userStatuses.map((value) => ({ value, label: userStatusLabels[value] ?? value })),
       renderCell: (p) => {
         const label = userStatusLabels[p.value] ?? p.value
-        const chipSx =
-          p.value === 'active'
-            ? { bgcolor: '#16a34a22', color: '#4ade80', border: '1px solid #16a34a55' }
-            : p.value === 'suspended'
-            ? { bgcolor: '#d9770622', color: '#fbbf24', border: '1px solid #d9770655' }
-            : { bgcolor: 'action.disabledBackground', color: 'text.secondary' }
-        return <Chip size="small" label={label} sx={{ fontWeight: 700, fontSize: '0.72rem', ...chipSx }} />
+        const color = p.value === 'active' ? 'success' : p.value === 'suspended' ? 'warning' : 'default'
+        return <Chip size="small" label={label} color={color as any} variant="outlined" sx={{ fontWeight: 700, fontSize: '0.72rem' }} />
       },
     },
     {

@@ -97,11 +97,17 @@ function isSupervisorUser(user: UserRaw) {
 function StatusChip({ status }: { status: string }) {
   const color: Record<string, { bgcolor: string; color: string }> = {
     Pending: { bgcolor: 'warning.main', color: 'warning.contrastText' },
+    pending: { bgcolor: 'warning.main', color: 'warning.contrastText' },
     InProgress: { bgcolor: 'info.main', color: 'info.contrastText' },
+    in_progress: { bgcolor: 'info.main', color: 'info.contrastText' },
     Closed: { bgcolor: 'success.main', color: 'success.contrastText' },
+    closed: { bgcolor: 'success.main', color: 'success.contrastText' },
     Cancelled: { bgcolor: 'error.main', color: 'error.contrastText' },
+    cancelled: { bgcolor: 'error.main', color: 'error.contrastText' },
     WaitingForClient: { bgcolor: 'warning.light', color: 'warning.contrastText' },
+    waiting_for_client: { bgcolor: 'warning.light', color: 'warning.contrastText' },
     WaitingForProvider: { bgcolor: 'warning.dark', color: 'warning.contrastText' },
+    waiting_for_provider: { bgcolor: 'warning.dark', color: 'warning.contrastText' },
   }
   const c = color[status] ?? { bgcolor: 'action.disabledBackground', color: 'text.secondary' }
   return <Chip label={t(caseStatusLabels, status)} size="small" sx={{ fontWeight: 600, ...c }} />
@@ -110,9 +116,13 @@ function StatusChip({ status }: { status: string }) {
 function PriorityChip({ priority }: { priority: string }) {
   const color: Record<string, { bgcolor: string; color: string }> = {
     Urgent: { bgcolor: 'error.main', color: 'error.contrastText' },
+    urgent: { bgcolor: 'error.main', color: 'error.contrastText' },
     High: { bgcolor: 'warning.main', color: 'warning.contrastText' },
+    high: { bgcolor: 'warning.main', color: 'warning.contrastText' },
     Medium: { bgcolor: 'info.main', color: 'info.contrastText' },
+    medium: { bgcolor: 'info.main', color: 'info.contrastText' },
     Low: { bgcolor: 'action.disabledBackground', color: 'text.secondary' },
+    low: { bgcolor: 'action.disabledBackground', color: 'text.secondary' },
   }
   const c = color[priority] ?? { bgcolor: 'action.disabledBackground', color: 'text.secondary' }
   return <Chip label={t(casePriorityLabels, priority)} size="small" sx={{ fontWeight: 600, ...c }} />

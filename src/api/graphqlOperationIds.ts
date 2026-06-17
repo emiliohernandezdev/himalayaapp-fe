@@ -44,6 +44,16 @@ export const graphqlOperationIds = {
   securityAuditLogs: 'aa00100100100111',
   upsertSecurityAccessRules: 'aa00100100100112',
   mySecurityAccessRules: 'aa00100100100113',
+  dashboardSummary: 'aa00100100100116',
+  userDashboards: 'aa00100100100117',
+  saveUserDashboard: 'aa00100100100118',
+  removeUserDashboard: 'aa00100100100119',
+  widgets: 'aa00100100100120',
+  createWidget: 'aa00100100100121',
+  updateWidget: 'aa00100100100122',
+  removeWidget: 'aa00100100100123',
+  setPrimaryDashboard: 'aa00100100100124',
+  systemHealth: 'aa00100100100125',
 } as const
 
 export type GraphqlOperationId =

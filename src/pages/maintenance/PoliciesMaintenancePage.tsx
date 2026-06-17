@@ -185,11 +185,24 @@ export function PoliciesMaintenancePage() {
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return { bgcolor: 'success.main', color: 'success.contrastText' }
-      case 'PendingRenewal': return { bgcolor: 'warning.main', color: 'warning.contrastText' }
-      case 'Expired': case 'Cancelled': return { bgcolor: 'error.main', color: 'error.contrastText' }
-      default: return { bgcolor: 'action.disabledBackground', color: 'text.secondary' }
+    const s = String(status || '').toLowerCase()
+    switch (s) {
+      case 'active':
+      case 'vigente':
+      case 'active_policy':
+        return { bgcolor: 'success.main', color: 'success.contrastText' }
+      case 'pendingrenewal':
+      case 'pending_renewal':
+      case 'draft':
+      case 'borrador':
+        return { bgcolor: 'warning.main', color: 'warning.contrastText' }
+      case 'expired':
+      case 'cancelled':
+      case 'cancelada':
+      case 'vencida':
+        return { bgcolor: 'error.main', color: 'error.contrastText' }
+      default:
+        return { bgcolor: 'action.disabledBackground', color: 'text.secondary' }
     }
   }
 

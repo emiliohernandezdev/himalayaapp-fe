@@ -118,17 +118,21 @@ export function ProductsMaintenancePage() {
     {
       field: 'status', headerName: 'Estado', width: 130, type: 'singleSelect',
       valueOptions: Object.entries(productStatusLabels).map(([value, label]) => ({ value, label })),
-      renderCell: (params) => (
-        <Chip
-          label={t(productStatusLabels, params.row.status)}
-          size="small"
-          sx={{
-            fontWeight: 600,
-            bgcolor: params.row.status === 'Active' ? 'success.main' : params.row.status === 'Draft' ? 'warning.main' : 'action.disabledBackground',
-            color: params.row.status === 'Active' ? 'success.contrastText' : params.row.status === 'Draft' ? 'warning.contrastText' : 'text.secondary',
-          }}
-        />
-      ),
+      renderCell: (params) => {
+        const isOptActive = params.row.status === 'Active' || params.row.status === 'active'
+        const isOptDraft = params.row.status === 'Draft' || params.row.status === 'draft'
+        return (
+          <Chip
+            label={t(productStatusLabels, params.row.status)}
+            size="small"
+            sx={{
+              fontWeight: 600,
+              bgcolor: isOptActive ? 'success.main' : isOptDraft ? 'warning.main' : 'action.disabledBackground',
+              color: isOptActive ? 'success.contrastText' : isOptDraft ? 'warning.contrastText' : 'text.secondary',
+            }}
+          />
+        )
+      },
     },
     ...(canManageProducts ? [{
       field: 'actions', headerName: '', width: 60, sortable: false,

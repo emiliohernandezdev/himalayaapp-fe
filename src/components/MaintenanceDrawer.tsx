@@ -149,6 +149,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
   const canViewPolicies = usePermission('view_policies')
   const canViewCases = usePermission('view_cases')
   const canViewTags = usePermission('view_tags')
+  const canViewWidgets = usePermission('view_widgets')
 
   const canManageUsers = usePermission('manage_users')
   const canManageRoles = usePermission('manage_roles')
@@ -163,6 +164,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
       if (module.slug === 'policies') return canViewPolicies
       if (module.slug === 'cases') return canViewCases
       if (module.slug === 'tags') return canViewTags
+      if (module.slug === 'widgets') return canViewWidgets
 
       if (module.slug === 'security-users') return canManageUsers
       if (module.slug === 'security-roles') return canManageRoles
@@ -178,6 +180,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
     canViewPolicies,
     canViewCases,
     canViewTags,
+    canViewWidgets,
     canManageUsers,
     canManageRoles,
     canManageSecurityMatrix,

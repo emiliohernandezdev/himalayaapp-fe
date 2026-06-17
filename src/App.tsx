@@ -14,6 +14,7 @@ import { PoliciesMaintenancePage } from './pages/maintenance/PoliciesMaintenance
 import { ProductsMaintenancePage } from './pages/maintenance/ProductsMaintenancePage'
 import { ProvidersMaintenancePage } from './pages/maintenance/ProvidersMaintenancePage'
 import { TagsMaintenancePage } from './pages/maintenance/TagsMaintenancePage'
+import { WidgetsMaintenancePage } from './pages/maintenance/WidgetsMaintenancePage'
 import { PoliciesPage } from './pages/PoliciesPage'
 import { TasksPage } from './pages/TasksPage'
 import { UsersPage } from './pages/UsersPage'
@@ -32,7 +33,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-        <Toaster theme={mode} position="bottom-right" richColors />
+        <Toaster closeButton theme={mode} position="bottom-right" richColors />
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage mode={mode} />} />
@@ -52,6 +53,7 @@ function App() {
               <Route path="/maintenance/cases" element={<CasesMaintenancePage />} />
               <Route path="/maintenance/cases/:id" element={<CasesMaintenancePage />} />
               <Route path="/maintenance/tags" element={<TagsMaintenancePage />} />
+              <Route path="/maintenance/widgets" element={<WidgetsMaintenancePage />} />
               <Route path="/maintenance/*" element={<Navigate to="/dashboard" replace />} />
               <Route path="/policies" element={<PoliciesPage />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

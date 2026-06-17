@@ -9,6 +9,7 @@ import {
   Tags,
   UsersRound,
   Activity,
+  Blocks,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -23,6 +24,7 @@ const iconMap: Record<string, LucideIcon> = {
   Tags,
   UsersRound,
   Activity,
+  Blocks,
 }
 
 export function getMaintenanceModuleIcon(icon: string) {

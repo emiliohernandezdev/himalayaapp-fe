@@ -21,12 +21,68 @@ export type MaintenanceRecord = {
   eyebrow?: string
 }
 
+export type DashboardSummary = {
+  generatedAt: string
+  visibility: {
+    canViewClients: boolean
+    canViewPolicies: boolean
+    canViewCases: boolean
+    canViewProviders: boolean
+    canViewProducts: boolean
+    canViewPremiums: boolean
+    canExport: boolean
+  }
+  metrics: Array<{
+    key: string
+    label: string
+    value: string
+    detail: string
+    tone: 'primary' | 'success' | 'warning'
+  }>
+  shortcuts: Array<{
+    slug: string
+    title: string
+    description: string
+    route: string
+    icon: string
+  }>
+  renewals: Array<{
+    policyUuid: string
+    policyNumber: string
+    clientName: string
+    endDate: string
+    daysRemaining: number
+    progress: number
+    premiumAmount?: number | null
+    currency: string
+  }>
+  followUps: Array<{
+    caseUuid: string
+    caseNumber: string
+    title: string
+    clientName: string
+    status: string
+    priority: string
+    dueAt?: string | null
+    assignedTo?: string | null
+  }>
+  caseBuckets: Array<{
+    status: string
+    label: string
+    count: number
+  }>
+}
+
 type MaintenanceModulesResponse = {
   maintenanceModules: MaintenanceModuleDto[]
 }
 
 export function fetchMaintenanceModules() {
   return graphqlRequest<MaintenanceModulesResponse>(graphqlOperationIds.maintenanceModules).then((data) => data.maintenanceModules)
+}
+
+export function fetchDashboardSummary() {
+  return graphqlRequest<{ dashboardSummary: DashboardSummary }>(graphqlOperationIds.dashboardSummary).then((data) => data.dashboardSummary)
 }
 
 // ─── Providers ──────────────────────────────────────────
@@ -354,3 +410,92 @@ export type UserRaw = {
 export function fetchUsers() {
   return graphqlRequest<{ users: UserRaw[] }>(graphqlOperationIds.users).then((data) => data.users)
 }
+
+// ─── User Dashboards ────────────────────────────────────
+
+export type UserDashboardDto = {
+  uuid: string
+  name: string
+  config: string
+  isPrimary: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export function fetchUserDashboards() {
+  return graphqlRequest<{ userDashboards: UserDashboardDto[] }>(graphqlOperationIds.userDashboards).then((data) => data.userDashboards)
+}
+
+export function saveUserDashboardApi(name: string, config: string) {
+  return graphqlRequest<{ saveUserDashboard: UserDashboardDto }>(
+    graphqlOperationIds.saveUserDashboard,
+    { name, config }
+  ).then((data) => data.saveUserDashboard)
+}
+
+export function removeUserDashboardApi(name: string) {
+  return graphqlRequest<{ removeUserDashboard: boolean }>(
+    graphqlOperationIds.removeUserDashboard,
+    { name }
+  ).then((data) => data.removeUserDashboard)
+}
+
+// ─── Widgets CRUD ───────────────────────────────────────
+
+export type WidgetRaw = {
+  uuid: string
+  slug: string
+  title: string
+  description: string
+  icon: string
+  category: string
+  presentationType: string
+  defaultLayout: string
+  enabled: boolean
+}
+
+export function fetchWidgets() {
+  return graphqlRequest<{ widgets: WidgetRaw[] }>(graphqlOperationIds.widgets).then((data) => data.widgets)
+}
+
+export function createWidget(input: Record<string, unknown>) {
+  return graphqlRequest<{ createWidget: { uuid: string } }>(
+    graphqlOperationIds.createWidget,
+    { input }
+  )
+}
+
+export function updateWidget(input: Record<string, unknown>) {
+  return graphqlRequest<{ updateWidget: { uuid: string } }>(
+    graphqlOperationIds.updateWidget,
+    { input }
+  )
+}
+
+export function removeWidget(uuid: string) {
+  return graphqlRequest<{ removeWidget: boolean }>(
+    graphqlOperationIds.removeWidget,
+    { uuid }
+  )
+}
+
+export function setPrimaryDashboardApi(name: string) {
+  return graphqlRequest<{ setPrimaryDashboard: { uuid: string; name: string; isPrimary: boolean } }>(
+    graphqlOperationIds.setPrimaryDashboard,
+    { name }
+  ).then((data) => data.setPrimaryDashboard)
+}
+
+export type SystemHealthDto = {
+  status: string
+  dbConnected: boolean
+  memoryUsage: number
+  diskUsage: number
+  uptime: number
+  cpuStatus: string
+}
+
+export function fetchSystemHealth() {
+  return graphqlRequest<{ systemHealth: SystemHealthDto }>(graphqlOperationIds.systemHealth).then((data) => data.systemHealth)
+}
+
