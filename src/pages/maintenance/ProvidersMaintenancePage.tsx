@@ -13,14 +13,17 @@ import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { providerStatusLabels, providerTypeLabels, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 
+const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((val) => (val === '' ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
+
 const providerSchema = z.object({
   name: z.string().min(2, 'Mínimo 2 caracteres'),
-  contactName: z.string().optional(),
-  contactEmail: z.string().email('Email inválido').optional().or(z.literal('')),
-  contactPhone: z.string().optional(),
-  logo: z.string().url('Debe ser una URL válida').optional().or(z.literal('')),
-  address: z.string().optional(),
-  taxId: z.string().optional(),
+  contactName: emptyToUndefined(z.string().optional()),
+  contactEmail: emptyToUndefined(z.string().email('Email inválido').optional()),
+  contactPhone: emptyToUndefined(z.string().optional()),
+  logo: emptyToUndefined(z.string().url('Debe ser una URL válida').optional()),
+  address: emptyToUndefined(z.string().optional()),
+  taxId: emptyToUndefined(z.string().optional()),
   type: z.enum(['InsuranceCompany', 'SuretyCompany', 'ServiceProvider']),
   status: z.enum(['Active', 'Inactive', 'UnderReview']),
 })
@@ -248,24 +251,24 @@ export function ProvidersMaintenancePage() {
                 )} />
               </Stack>
               <Controller name="contactName" control={control} render={({ field }) => (
-                <TextField {...field} label="Nombre del Contacto" fullWidth />
+                <TextField {...field} label="Nombre del Contacto" fullWidth error={!!errors.contactName} helperText={errors.contactName?.message?.toString() ?? ' '} />
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="contactEmail" control={control} render={({ field }) => (
-                  <TextField {...field} label="Email de Contacto" fullWidth error={!!errors.contactEmail} helperText={errors.contactEmail?.message} />
+                  <TextField {...field} label="Email de Contacto" fullWidth error={!!errors.contactEmail} helperText={errors.contactEmail?.message?.toString() ?? ' '} />
                 )} />
                 <Controller name="contactPhone" control={control} render={({ field }) => (
-                  <TextField {...field} label="Teléfono" fullWidth />
+                  <TextField {...field} label="Teléfono" fullWidth error={!!errors.contactPhone} helperText={errors.contactPhone?.message?.toString() ?? ' '} />
                 )} />
               </Stack>
               <Controller name="taxId" control={control} render={({ field }) => (
-                <TextField {...field} label="NIT / RFC" fullWidth />
+                <TextField {...field} label="NIT / RFC" fullWidth error={!!errors.taxId} helperText={errors.taxId?.message?.toString() ?? ' '} />
               )} />
               <Controller name="logo" control={control} render={({ field }) => (
-                <TextField {...field} label="URL del Logo" fullWidth placeholder="https://..." error={!!errors.logo} helperText={errors.logo?.message} />
+                <TextField {...field} label="URL del Logo" fullWidth placeholder="https://..." error={!!errors.logo} helperText={errors.logo?.message?.toString() ?? ' '} />
               )} />
               <Controller name="address" control={control} render={({ field }) => (
-                <TextField {...field} label="Dirección" fullWidth />
+                <TextField {...field} label="Dirección" fullWidth error={!!errors.address} helperText={errors.address?.message?.toString() ?? ' '} />
               )} />
             </Stack>
           </DialogContent>

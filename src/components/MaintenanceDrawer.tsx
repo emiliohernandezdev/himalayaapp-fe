@@ -11,6 +11,7 @@ import { getMaintenanceModuleIcon } from './maintenanceModuleIcons'
 import { useAuthStore } from '../store/useAuthStore'
 import { useMaintenanceDrawerStore } from '../store/useMaintenanceDrawerStore'
 import { usePermission } from '../hooks/usePermission'
+import { normalizeAppRoute } from '../utils/routes'
 
 type MaintenanceDrawerProps = {
   open: boolean
@@ -102,7 +103,7 @@ const securityModules: MaintenanceModuleDto[] = [
     uuid: 'security-roles',
     slug: 'security-roles',
     title: 'Roles',
-    description: 'Administra jerarquias y perfiles base para accesos del sistema.',
+    description: 'Administra jerarquías y perfiles base para accesos del sistema.',
     route: '/security/roles',
     icon: 'ShieldCheck',
     tone: 'indigo',
@@ -112,7 +113,7 @@ const securityModules: MaintenanceModuleDto[] = [
     uuid: 'security-matrix',
     slug: 'security-matrix',
     title: 'Matriz de seguridad',
-    description: 'Define accesos por nodo, modulo, mantenimiento y accion sensible.',
+    description: 'Define accesos por nodo, módulo, mantenimiento y accion sensible.',
     route: '/security/matrix',
     icon: 'KeyRound',
     tone: 'violet',
@@ -121,8 +122,8 @@ const securityModules: MaintenanceModuleDto[] = [
   {
     uuid: 'security-audit',
     slug: 'security-audit',
-    title: 'Historico general',
-    description: 'Consulta acciones importantes, autorizaciones y cambios de informacion.',
+    title: 'Histórico general',
+    description: 'Consulta acciones importantes, autorizaciones y cambios de información.',
     route: '/security/audit',
     icon: 'Activity',
     tone: 'teal',
@@ -190,13 +191,13 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
 
   const visibleModules = useMemo(() => {
     if (view === 'favorites') {
-      return allowedModules.filter((module) => favoriteRoutes.includes(module.route))
+      return allowedModules.filter((module) => favoriteRoutes.includes(normalizeAppRoute(module.route)))
     }
 
     if (view === 'recent') {
       return allowedModules
-        .filter((module) => recentRoutes.includes(module.route))
-        .sort((first, second) => recentRoutes.indexOf(first.route) - recentRoutes.indexOf(second.route))
+        .filter((module) => recentRoutes.includes(normalizeAppRoute(module.route)))
+        .sort((first, second) => recentRoutes.indexOf(normalizeAppRoute(first.route)) - recentRoutes.indexOf(normalizeAppRoute(second.route)))
     }
 
     return allowedModules
@@ -213,17 +214,17 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
   )
 
   const rememberRecent = (route: string) => {
-    rememberRoute(route)
+    rememberRoute(normalizeAppRoute(route))
     onClose()
   }
 
   const emptyMessage =
     normalizedQuery.length > 0
-      ? 'No hay mantenimientos que coincidan con la busqueda.'
+      ? 'No hay mantenimientos que coincidan con la búsqueda.'
       : view === 'favorites'
         ? 'Marca mantenimientos con la estrella para tenerlos siempre a mano.'
         : view === 'recent'
-          ? 'Los mantenimientos que abras apareceran aqui.'
+          ? 'Los mantenimientos que abras aparecerán aquí.'
           : 'No hay mantenimientos disponibles.'
 
   return (
@@ -262,7 +263,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
                 Himalaya
               </Typography>
               <Typography variant="body2" color="text.secondary" className="hidden sm:block">
-                {isSecurityModule ? 'Security - usuarios, roles y auditoria' : 'SSM - administracion de seguros y fianzas'}
+                {isSecurityModule ? 'Security - usuarios, roles y auditoría' : 'SSM - administración de seguros y fianzas'}
               </Typography>
             </Box>
           </Stack>
@@ -336,7 +337,8 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
               {filteredModules.map((module) => {
                 const Icon = getMaintenanceModuleIcon(module.icon)
                 const tone = toneStyles[module.tone as keyof typeof toneStyles] ?? toneStyles.sky
-                const isFavorite = favoriteRoutes.includes(module.route)
+                const route = normalizeAppRoute(module.route)
+                const isFavorite = favoriteRoutes.includes(route)
 
                 return (
                   <Box
@@ -363,7 +365,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
                     <Tooltip title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}>
                       <IconButton
                         aria-label={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-                        onClick={() => toggleFavorite(module.route)}
+                        onClick={() => toggleFavorite(route)}
                         size="small"
                         sx={{
                           position: 'absolute',
@@ -388,8 +390,8 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
 
                     <Box
                       component={Link}
-                      to={module.route}
-                      onClick={() => rememberRecent(module.route)}
+                      to={route}
+                      onClick={() => rememberRecent(route)}
                       className="relative z-0 block min-h-36 p-5 pr-16 no-underline text-inherit sm:min-h-40"
                     >
                       <Typography variant="subtitle1" className="pr-2">

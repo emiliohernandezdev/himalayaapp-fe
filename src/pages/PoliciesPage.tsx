@@ -7,7 +7,7 @@ export function PoliciesPage() {
   return (
     <Stack spacing={4}>
       <PageHeader
-        title="Polizas"
+        title="Pólizas"
         description="Control de vigencias, proveedores, productos y estado documental."
         actionLabel="Nueva poliza"
         icon={FileText}

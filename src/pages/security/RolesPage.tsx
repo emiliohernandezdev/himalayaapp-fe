@@ -21,7 +21,7 @@ const roleSchema = z.object({
     .regex(/^[a-z][a-z0-9_]*$/, 'Usa minusculas, numeros y guion bajo; debe iniciar con letra.'),
   name: z.string().trim().min(2, 'El nombre debe tener al menos 2 caracteres.').max(80, 'El nombre es demasiado largo.'),
   description: z.string().trim().max(240, 'La descripcion no puede superar 240 caracteres.').optional(),
-  hierarchy: z.coerce.number().int('La jerarquia debe ser un numero entero.').min(0, 'Minimo 0.').max(100, 'Maximo 100.'),
+  hierarchy: z.coerce.number().int('La jerarquía debe ser un numero entero.').min(0, 'Mínimo 0.').max(100, 'Máximo 100.'),
   elevated: z.boolean(),
   enabled: z.boolean(),
 })

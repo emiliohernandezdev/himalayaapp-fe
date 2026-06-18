@@ -15,7 +15,6 @@ import { ProductsMaintenancePage } from './pages/maintenance/ProductsMaintenance
 import { ProvidersMaintenancePage } from './pages/maintenance/ProvidersMaintenancePage'
 import { TagsMaintenancePage } from './pages/maintenance/TagsMaintenancePage'
 import { WidgetsMaintenancePage } from './pages/maintenance/WidgetsMaintenancePage'
-import { PoliciesPage } from './pages/PoliciesPage'
 import { TasksPage } from './pages/TasksPage'
 import { UsersPage } from './pages/UsersPage'
 import { SecurityDashboardPage } from './pages/security/SecurityDashboardPage'
@@ -24,6 +23,7 @@ import { SecurityMatrixPage } from './pages/security/SecurityMatrixPage'
 import { RolesPage } from './pages/security/RolesPage'
 import { createHimalayaTheme } from './theme/himalayaTheme'
 import { useThemeModeStore } from './store/useThemeModeStore'
+import { ErrorState } from './components/ErrorState'
 
 function App() {
   const { mode, toggleMode } = useThemeModeStore()
@@ -46,18 +46,16 @@ function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/users" element={<UsersPage />} />
-              <Route path="/maintenance/providers" element={<ProvidersMaintenancePage />} />
-              <Route path="/maintenance/clients" element={<ClientsMaintenancePage />} />
-              <Route path="/maintenance/products" element={<ProductsMaintenancePage />} />
-              <Route path="/maintenance/policies" element={<PoliciesMaintenancePage />} />
-              <Route path="/maintenance/cases" element={<CasesMaintenancePage />} />
-              <Route path="/maintenance/cases/:id" element={<CasesMaintenancePage />} />
-              <Route path="/maintenance/tags" element={<TagsMaintenancePage />} />
-              <Route path="/maintenance/widgets" element={<WidgetsMaintenancePage />} />
-              <Route path="/maintenance/*" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/policies" element={<PoliciesPage />} />
+              <Route path="/providers" element={<ProvidersMaintenancePage />} />
+              <Route path="/clients" element={<ClientsMaintenancePage />} />
+              <Route path="/products" element={<ProductsMaintenancePage />} />
+              <Route path="/policies" element={<PoliciesMaintenancePage />} />
+              <Route path="/cases" element={<CasesMaintenancePage />} />
+              <Route path="/cases/:id" element={<CasesMaintenancePage />} />
+              <Route path="/tags" element={<TagsMaintenancePage />} />
+              <Route path="/widgets" element={<WidgetsMaintenancePage />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<ErrorState type="404" />} />
             </Route>
           </Routes>
         </BrowserRouter>

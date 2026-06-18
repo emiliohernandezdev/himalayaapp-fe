@@ -104,7 +104,7 @@ export const policies = [
 export const maintenanceSections = [
   {
     title: 'Proveedores',
-    route: '/maintenance/providers',
+    route: '/providers',
     icon: Building2,
     description: 'Aseguradoras, afianzadoras y contactos comerciales.',
     count: '18',
@@ -117,7 +117,7 @@ export const maintenanceSections = [
   },
   {
     title: 'Clientes',
-    route: '/maintenance/clients',
+    route: '/clients',
     icon: UsersRound,
     description: 'Personas, empresas, contactos y datos fiscales.',
     count: '864',
@@ -130,7 +130,7 @@ export const maintenanceSections = [
   },
   {
     title: 'Productos',
-    route: '/maintenance/products',
+    route: '/products',
     icon: PackageCheck,
     description: 'Productos asociados a proveedores y ramos.',
     count: '72',
@@ -142,7 +142,7 @@ export const maintenanceSections = [
     ],
   },
   {
-    title: 'Polizas',
+    title: 'Pólizas',
     route: '/policies',
     icon: FileText,
     description: 'Control de vigencias, documentos y renovaciones.',
@@ -152,7 +152,7 @@ export const maintenanceSections = [
   },
   {
     title: 'Ramos',
-    route: '/maintenance/lines',
+    route: '/lines',
     icon: FolderKanban,
     description: 'Categorias comerciales para seguros y fianzas.',
     count: '24',
@@ -165,9 +165,9 @@ export const maintenanceSections = [
   },
   {
     title: 'Tipos de documento',
-    route: '/maintenance/document-types',
+    route: '/document-types',
     icon: FileBadge2,
-    description: 'Documentos requeridos por clientes, polizas y proveedores.',
+    description: 'Documentos requeridos por clientes, pólizas y proveedores.',
     count: '36',
     tone: 'amber',
     records: [
@@ -178,7 +178,7 @@ export const maintenanceSections = [
   },
   {
     title: 'Formas de pago',
-    route: '/maintenance/payment-methods',
+    route: '/payment-methods',
     icon: ReceiptText,
     description: 'Metodos de cobro y pago de primas.',
     count: '9',
@@ -191,7 +191,7 @@ export const maintenanceSections = [
   },
   {
     title: 'Monedas',
-    route: '/maintenance/currencies',
+    route: '/currencies',
     icon: Landmark,
     description: 'Monedas disponibles para primas, comisiones y pagos.',
     count: '4',
@@ -204,7 +204,7 @@ export const maintenanceSections = [
   },
   {
     title: 'Estados de poliza',
-    route: '/maintenance/policy-statuses',
+    route: '/policy-statuses',
     icon: ListChecks,
     description: 'Estados operativos para controlar el ciclo de la poliza.',
     count: '12',
@@ -217,7 +217,7 @@ export const maintenanceSections = [
   },
   {
     title: 'Comisiones',
-    route: '/maintenance/commissions',
+    route: '/commissions',
     icon: HandCoins,
     description: 'Reglas base para comisiones por proveedor y producto.',
     count: '31',
@@ -230,7 +230,7 @@ export const maintenanceSections = [
   },
   {
     title: 'Ubicaciones',
-    route: '/maintenance/locations',
+    route: '/locations',
     icon: MapPin,
     description: 'Paises, departamentos, municipios y zonas de operacion.',
     count: '348',
@@ -243,7 +243,7 @@ export const maintenanceSections = [
   },
   {
     title: 'Vehiculos',
-    route: '/maintenance/vehicles',
+    route: '/vehicles',
     icon: Car,
     description: 'Catalogo vehicular para flotillas y seguros de auto.',
     count: '542',
@@ -256,14 +256,14 @@ export const maintenanceSections = [
   },
   {
     title: 'Etiquetas',
-    route: '/maintenance/tags',
+    route: '/tags',
     icon: Tags,
-    description: 'Etiquetas para clasificar clientes, tareas y polizas.',
+    description: 'Etiquetas para clasificar clientes, tareas y pólizas.',
     count: '19',
     tone: 'cyan',
     records: [
       ['Cliente VIP', 'Comercial', 'Activo'],
-      ['Documentos pendientes', 'Operacion', 'Activo'],
+      ['Documentos pendientes', 'Operación', 'Activo'],
       ['Alta prioridad', 'Seguimiento', 'Activo'],
     ],
   },
@@ -283,7 +283,7 @@ export const dashboardModules = [
     description: 'Seguimientos, notas y comentarios por responsable.',
   },
   {
-    label: 'Polizas',
+    label: 'Pólizas',
     route: '/policies',
     icon: ShieldCheck,
     description: 'Vigencias, renovaciones y documentos principales.',

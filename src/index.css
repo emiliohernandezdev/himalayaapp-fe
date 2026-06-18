@@ -51,6 +51,7 @@ body {
 
 .dashboard-grid {
   min-height: 720px;
+  width: 100%;
 }
 
 .dashboard-grid .grid-stack-item-content {

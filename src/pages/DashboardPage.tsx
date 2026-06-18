@@ -53,10 +53,10 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import * as Lucide from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
-import * as z from 'zod'
+// import * as z from 'zod'
 import dayjs from 'dayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import {
@@ -71,6 +71,7 @@ import {
   type SystemHealthDto,
 } from '../api/maintenanceApi'
 import { useApiQuery } from '../api/useApiQuery'
+import { subscribeAppEvent } from '../utils/appEvents'
 import { PieChart, BarChart, ScatterChart, SparkLineChart, Gauge, LineChart } from '@mui/x-charts'
 
 type WidgetId = string
@@ -148,14 +149,17 @@ type DashboardRecord = {
   isPrimary?: boolean
 }
 
-const dashboardNameSchema = z.object({
+/*
+const _dashboardNameSchema = z.object({
   name: z.string()
     .trim()
     .min(2, 'El nombre debe tener al menos 2 caracteres.')
     .max(60, 'El nombre no puede superar 60 caracteres.')
     .regex(/^[\p{L}\p{N}\s._-]+$/u, 'Usa letras, numeros, espacios, punto, guion o guion bajo.'),
 })
+*/
 
+/*
 const widgetFilterSchema = z.object({
   field: z.string().trim().min(1, 'Selecciona un campo.'),
   operator: z.enum(['eq', 'neq', 'contains', 'not_contains', 'gt', 'lt', 'is_null', 'is_not_null']),
@@ -165,15 +169,17 @@ const widgetFilterSchema = z.object({
     ctx.addIssue({ code: 'custom', path: ['value'], message: 'Ingresa un valor para el filtro.' })
   }
 })
+*/
 
-const widgetSettingsSchema = z.object({
+/*
+const _widgetSettingsSchema = z.object({
   title: z.string().max(80, 'La etiqueta no puede superar 80 caracteres.').optional(),
   subtitle: z.string().max(160, 'El subtitulo no puede superar 160 caracteres.').optional(),
   dataSource: z.enum(['clientes', 'polizas', 'casos']).optional(),
   groupByField: z.string().optional(),
   aggregateFunction: z.string().optional(),
   aggregateField: z.string().optional(),
-  daysWindow: z.number().min(1, 'La ventana minima es de 1 dia.').max(365, 'La ventana maxima es de 365 dias.').optional(),
+  daysWindow: z.number().min(1, 'La ventana mínima es de 1 día.').max(365, 'La ventana máxima es de 365 días.').optional(),
   limit: z.number().min(1, 'El minimo es 1.').max(100, 'El maximo es 100.').optional(),
   fieldsToShow: z.array(z.string()).optional(),
   filters: z.array(widgetFilterSchema).optional(),
@@ -187,6 +193,7 @@ const widgetSettingsSchema = z.object({
     ctx.addIssue({ code: 'custom', path: ['fieldsToShow'], message: 'Selecciona al menos una columna.' })
   }
 })
+*/
 
 type DashboardNameErrors = Partial<Record<'name', string>>
 type WidgetSettingsErrors = Record<string, string>
@@ -1308,13 +1315,14 @@ function CustomMetricWidget({
   )
 }
 
-function CustomSystemHealthWidget() {
+function CustomSystemHealthWidget({ refreshVersion = 0 }: { refreshVersion?: number }) {
   const [health, setHealth] = useState<SystemHealthDto | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let active = true
     const load = () => {
+      setLoading(true)
       fetchSystemHealth()
         .then((res) => {
           if (active) {
@@ -1328,12 +1336,10 @@ function CustomSystemHealthWidget() {
         })
     }
     load()
-    const timer = setInterval(load, 5000)
     return () => {
       active = false
-      clearInterval(timer)
     }
-  }, [])
+  }, [refreshVersion])
 
   if (loading || !health) {
     return (
@@ -1343,8 +1349,64 @@ function CustomSystemHealthWidget() {
     )
   }
 
-  const statusColor = health.status === 'ok' ? '#34c759' : health.status === 'warning' ? '#ff9500' : '#ff3b30'
+  const checks = [
+    {
+      label: 'Ping DB',
+      ok: health.dbConnected,
+      detail: health.dbConnected ? 'Disponible' : 'Sin respuesta',
+    },
+    {
+      label: 'RAM',
+      ok: health.memoryUsage < 85,
+      detail: health.memoryUsage < 85 ? 'Suficiente' : 'Alta presión',
+    },
+    {
+      label: 'Disco',
+      ok: health.diskUsage < 85,
+      detail: health.diskUsage < 85 ? 'Suficiente' : 'Espacio crítico',
+    },
+  ]
 
+  return (
+    <Stack spacing={1.1} sx={{ height: '100%', justifyContent: 'center' }}>
+      {checks.map((check) => (
+        <Stack
+          key={check.label}
+          direction="row"
+          spacing={1.25}
+          sx={{
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            minHeight: 42,
+            px: 1.25,
+            py: 0.9,
+            borderRadius: 2,
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(15,23,42,0.035)',
+            border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'}`,
+          }}
+        >
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+            {check.ok ? (
+              <CheckCircle2 size={18} color="#22c55e" />
+            ) : (
+              <ShieldAlert size={18} color="#f97316" />
+            )}
+            <Typography variant="body2" sx={{ fontWeight: 750 }}>
+              {check.label}
+            </Typography>
+          </Stack>
+          <Chip
+            size="small"
+            color={check.ok ? 'success' : 'warning'}
+            variant={check.ok ? 'outlined' : 'filled'}
+            label={check.detail}
+            sx={{ fontWeight: 700, minWidth: 104 }}
+          />
+        </Stack>
+      ))}
+    </Stack>
+  )
+  /*
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%', justifyContent: 'center' }}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1356,12 +1418,6 @@ function CustomSystemHealthWidget() {
               borderRadius: '50%',
               bgcolor: statusColor,
               boxShadow: `0 0 8px ${statusColor}`,
-              animation: 'pulse-health 2s infinite',
-              '@keyframes pulse-health': {
-                '0%': { boxShadow: `0 0 0 0 ${statusColor}a0` },
-                '70%': { boxShadow: `0 0 0 6px ${statusColor}00` },
-                '100%': { boxShadow: `0 0 0 0 ${statusColor}00` },
-              }
             }}
           />
           <Typography variant="body2" sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em', color: statusColor }}>
@@ -1470,6 +1526,7 @@ function CustomSystemHealthWidget() {
       </Grid>
     </Box>
   )
+  */
 }
 
 function DynamicWidgetContent({
@@ -1745,10 +1802,10 @@ function getGaugeValueAndLabel(source: string, rawData: any[]) {
 }
 
 export function DashboardPage() {
-  const { data, error, loading } = useApiQuery('dashboard-summary', fetchDashboardSummary)
+  const { data, error, loading, refetch: refetchDashboardSummary } = useApiQuery('dashboard-summary', fetchDashboardSummary)
 
   // Load widgets catalog from DB
-  const { data: dbWidgets, loading: loadingWidgetsCatalog } = useApiQuery('widgets-catalog', fetchWidgets)
+  const { data: dbWidgets, loading: loadingWidgetsCatalog, refetch: refetchWidgetsCatalog } = useApiQuery('widgets-catalog', fetchWidgets)
 
   // Compute widgetCatalog from dbWidgets dynamically
   const widgetCatalog = useMemo(() => {
@@ -1785,8 +1842,8 @@ export function DashboardPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [newDashboardName, setNewDashboardName] = useState('')
   const [renameDashboardName, setRenameDashboardName] = useState('')
-  const [newDashboardErrors, setNewDashboardErrors] = useState<DashboardNameErrors>({})
-  const [renameDashboardErrors, setRenameDashboardErrors] = useState<DashboardNameErrors>({})
+  const [_newDashboardErrors, _setNewDashboardErrors] = useState<DashboardNameErrors>({})
+  const [_renameDashboardErrors, _setRenameDashboardErrors] = useState<DashboardNameErrors>({})
 
   const currentDashboard = useMemo(() => {
     return dashboards.find((d) => d.name === currentDashboardName) || dashboards[0]
@@ -1802,10 +1859,42 @@ export function DashboardPage() {
 
   const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null)
   const [tempSettings, setTempSettings] = useState<WidgetSettings>({})
-  const [widgetSettingsErrors, setWidgetSettingsErrors] = useState<WidgetSettingsErrors>({})
+  const [_widgetSettingsErrors, _setWidgetSettingsErrors] = useState<WidgetSettingsErrors>({})
   const [widgetIdToRemove, setWidgetIdToRemove] = useState<string | null>(null)
   const [speedDialOpen, setSpeedDialOpen] = useState(false)
   const [widgetRefreshVersions, setWidgetRefreshVersions] = useState<Record<string, number>>({})
+
+  const refreshDashboardWidgets = useCallback(() => {
+    refetchDashboardSummary()
+    setWidgetRefreshVersions((current) => {
+      const next = { ...current }
+      const instances =
+        currentDashboardRef.current?.config.instances ??
+        Object.keys(visibilityRef.current).map((id) => ({ id, widgetId: id as WidgetId }))
+
+      instances.forEach((instance) => {
+        const widget = widgetCatalog.find((item) => item.id === instance.widgetId)
+        const presentationType = widget?.presentationType ?? ''
+        const isLiveDataWidget = !['Shortcuts', 'Security', 'SystemHealth', 'shortcuts', 'securityOverview'].includes(presentationType)
+
+        if (isLiveDataWidget) {
+          next[instance.id] = (next[instance.id] ?? 0) + 1
+        }
+      })
+      return next
+    })
+  }, [refetchDashboardSummary, widgetCatalog])
+
+  useEffect(() => {
+    return subscribeAppEvent('widgets:changed', () => {
+      refetchWidgetsCatalog()
+      refreshDashboardWidgets()
+    })
+  }, [refetchWidgetsCatalog, refreshDashboardWidgets])
+
+  useEffect(() => {
+    return subscribeAppEvent('records:changed', refreshDashboardWidgets)
+  }, [refreshDashboardWidgets])
 
   const configuringWidget = useMemo(() => {
     if (!configuringWidgetId) return undefined
@@ -1822,6 +1911,7 @@ export function DashboardPage() {
   const gridRef = useRef<GridStack | null>(null)
   const layoutRef = useRef<Record<string, WidgetLayout>>({})
   const visibilityRef = useRef(widgetVisibility)
+  const currentDashboardRef = useRef<DashboardRecord | undefined>(undefined)
   const noticeTimeoutRef = useRef<number | null>(null)
 
   // Load from database on mount — no default widgets, everything comes from DB
@@ -1880,6 +1970,10 @@ export function DashboardPage() {
   useEffect(() => {
     visibilityRef.current = widgetVisibility
   }, [widgetVisibility])
+
+  useEffect(() => {
+    currentDashboardRef.current = currentDashboard
+  }, [currentDashboard])
 
   useEffect(() => {
     return () => {
@@ -1973,6 +2067,7 @@ export function DashboardPage() {
   const syncLayoutFromGrid = () => {
     const grid = gridRef.current
     if (!grid) return
+    if (grid.getColumn() !== 12) return
 
     const saved = grid.save(false, false) as GridStackWidget[]
     const nextLayout = { ...layoutRef.current }
@@ -2018,10 +2113,12 @@ export function DashboardPage() {
         disableResize: !customizeMode,
         handle: '.dashboard-widget-drag',
         columnOpts: {
+          breakpointForWindow: true,
+          layout: 'moveScale',
           breakpoints: [
-            { w: 700, c: 1 },
-            { w: 1080, c: 6 },
-            { c: 12 },
+            { w: 640, c: 1, layout: 'list' },
+            { w: 1100, c: 6, layout: 'moveScale' },
+            { c: 12, layout: 'moveScale' },
           ],
         },
       },
@@ -2029,7 +2126,9 @@ export function DashboardPage() {
     )
 
     grid.setStatic(!customizeMode)
-    grid.on('change', syncLayoutFromGrid)
+    if (customizeMode) {
+      grid.on('change', syncLayoutFromGrid)
+    }
     gridRef.current = grid
 
     return () => {
@@ -2457,7 +2556,7 @@ export function DashboardPage() {
     const type = widget.presentationType || 'Metric'
 
     if (type === 'SystemHealth') {
-      return <CustomSystemHealthWidget />
+      return <CustomSystemHealthWidget refreshVersion={refreshVersion} />
     }
     return (
       <DynamicWidgetContent
@@ -2867,6 +2966,7 @@ export function DashboardPage() {
             const settings = widgetSettings[inst.id] ?? {}
             const title = settings.title || widget.title
             const isDynamicDataWidget = !['Shortcuts', 'Security', 'SystemHealth', 'shortcuts', 'securityOverview'].includes(widget.presentationType ?? '')
+            const canRefreshWidget = isDynamicDataWidget || widget.presentationType === 'SystemHealth'
 
             const gridItemProps = {
               className: 'grid-stack-item',
@@ -2889,7 +2989,7 @@ export function DashboardPage() {
                     editing={customizeMode}
                     onConfigure={() => handleOpenConfigure(inst.id)}
                     onRemove={() => setWidgetIdToRemove(inst.id)}
-                    onRefresh={isDynamicDataWidget ? () => {
+                    onRefresh={canRefreshWidget ? () => {
                       setWidgetRefreshVersions((current) => ({
                         ...current,
                         [inst.id]: (current[inst.id] ?? 0) + 1,
@@ -3239,7 +3339,7 @@ export function DashboardPage() {
                     {AGGREGATE_WINDOW_FUNCTIONS.has(tempSettings.aggregateFunction ?? 'count') && (
                       <Box>
                         <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Ventana de dias ({tempSettings.daysWindow ?? 30})
+                          Ventana de días ({tempSettings.daysWindow ?? 30})
                         </Typography>
                         <Slider
                           value={tempSettings.daysWindow ?? 30}
@@ -3255,7 +3355,7 @@ export function DashboardPage() {
                   </Stack>
                 )}
 
-              {/* â”€â”€â”€ Metric / Gauge: color â”€â”€â”€ */}
+              {/* Metric / Gauge: color */}
               {configuringWidget?.presentationType && (
                 configuringWidget.presentationType === 'Metric' ||
                 configuringWidget.presentationType === 'Gauge'
@@ -3838,15 +3938,15 @@ const AGGREGATE_FUNCTIONS = [
   { value: 'min', label: 'Valor minimo', description: 'Menor valor de un campo numerico' },
   { value: 'max', label: 'Valor maximo', description: 'Mayor valor de un campo numerico' },
   { value: 'distinct_count', label: 'Valores unicos', description: 'Cuenta valores distintos de un campo' },
-  { value: 'active_count', label: 'Activos / vigentes', description: 'Clientes activos, polizas vigentes o casos activos' },
+  { value: 'active_count', label: 'Activos / vigentes', description: 'Clientes activos, pólizas vigentes o casos activos' },
   { value: 'inactive_count', label: 'Inactivos / prospectos', description: 'Clientes no activos' },
-  { value: 'expired_count', label: 'Vencidos', description: 'Polizas vencidas' },
+  { value: 'expired_count', label: 'Vencidos', description: 'Pólizas vencidas' },
   { value: 'cancelled_count', label: 'Cancelados', description: 'Registros cancelados' },
   { value: 'open_count', label: 'Abiertos', description: 'Casos o registros no cerrados' },
   { value: 'closed_count', label: 'Cerrados', description: 'Registros completados' },
   { value: 'overdue_count', label: 'Atrasados por fecha', description: 'Vencidos segun fecha limite' },
-  { value: 'due_soon_count', label: 'Proximos a vencer', description: 'Vencen dentro de una ventana de dias' },
-  { value: 'renewal_due_count', label: 'Renovaciones proximas', description: 'Polizas vigentes o por renovar dentro de la ventana' },
+  { value: 'due_soon_count', label: 'Próximos a vencer', description: 'Vencen dentro de una ventana de días' },
+  { value: 'renewal_due_count', label: 'Renovaciones próximas', description: 'Pólizas vigentes o por renovar dentro de la ventana' },
   { value: 'active_rate', label: 'Porcentaje activo', description: 'Activos sobre el total filtrado' },
   { value: 'expiration_rate', label: 'Porcentaje vencido', description: 'Vencidos sobre el total filtrado' },
   { value: 'conversion_rate', label: 'Tasa de conversion', description: 'Activos sobre total filtrado' },

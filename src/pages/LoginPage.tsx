@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -42,6 +43,7 @@ type LoginFormData = z.infer<typeof loginSchema>
 export function LoginPage({ mode }: LoginPageProps) {
   const navigate = useNavigate()
   const loginStore = useAuthStore((state) => state.login)
+  const sessionExpired = useAuthStore((state) => state.sessionExpired)
   const [showPassword, setShowPassword] = useState(false)
   const [accessNodes, setAccessNodes] = useState<NodeAccess[]>([])
 
@@ -68,7 +70,7 @@ export function LoginPage({ mode }: LoginPageProps) {
 
       if (response.requiresModuleSelection || !response.accessToken) {
         setAccessNodes(response.accessNodes)
-        toast.info('Selecciona el modulo para continuar.')
+        toast.info('Selecciona el módulo para continuar.')
         return
       }
 
@@ -204,6 +206,22 @@ export function LoginPage({ mode }: LoginPageProps) {
                   </Typography>
                 </Stack>
 
+                {sessionExpired && (
+                  <Alert
+                    severity="warning"
+                    variant="outlined"
+                    sx={{
+                      borderRadius: 2.5,
+                      borderColor: 'warning.main',
+                      fontWeight: 600,
+                      fontSize: '0.85rem',
+                      alignItems: 'center',
+                    }}
+                  >
+                    Tu sesión expiró o fue cerrada. Por favor, inicia sesión de nuevo.
+                  </Alert>
+                )}
+
                 <Stack spacing={2.5}>
                   <Controller
                     name="email"
@@ -226,7 +244,7 @@ export function LoginPage({ mode }: LoginPageProps) {
                     render={({ field }) => (
                       <TextField
                         {...field}
-                        label="Contrasena *"
+                        label="Contraseña *"
                         type={showPassword ? 'text' : 'password'}
                         fullWidth
                         autoComplete="current-password"
@@ -280,7 +298,7 @@ export function LoginPage({ mode }: LoginPageProps) {
                     endIcon={isSubmitting ? undefined : <ArrowRight size={18} />}
                     startIcon={isSubmitting ? <CircularProgress size={18} color="inherit" /> : <LockKeyhole size={18} />}
                   >
-                    {isSubmitting ? 'Iniciando sesion...' : instanceOptions.length > 1 ? 'Entrar al modulo' : 'Entrar al sistema'}
+                    {isSubmitting ? 'Iniciando sesión...' : instanceOptions.length > 1 ? 'Entrar al módulo' : 'Entrar al sistema'}
                   </Button>
                 </Stack>
               </Stack>

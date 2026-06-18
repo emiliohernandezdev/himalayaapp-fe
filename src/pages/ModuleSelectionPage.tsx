@@ -45,7 +45,7 @@ export function ModuleSelectionPage({ mode }: ModuleSelectionPageProps) {
                 Seguros Himalaya
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Selecciona el modulo de trabajo
+                Selecciona el módulo de trabajo
               </Typography>
             </Box>
           </Stack>
@@ -55,7 +55,7 @@ export function ModuleSelectionPage({ mode }: ModuleSelectionPageProps) {
               Nodo operativo
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 720 }}>
-              Tu usuario puede entrar a estos modulos dentro del nodo Seguros Himalaya.
+              Tu usuario puede entrar a estos módulos dentro del nodo Seguros Himalaya.
             </Typography>
           </Box>
 

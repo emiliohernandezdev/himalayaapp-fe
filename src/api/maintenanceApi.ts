@@ -1,6 +1,19 @@
 import { graphqlRequest } from './graphqlClient'
 import { graphqlOperationIds } from './graphqlOperationIds'
 import type { NodeAccess } from '../store/useAuthStore'
+import { publishAppEvent } from '../utils/appEvents'
+
+function publishRecordsChanged(entity: string, action: 'create' | 'update' | 'delete', uuid?: string) {
+  publishAppEvent({ type: 'records:changed', source: 'maintenance-api', entity, action, uuid })
+}
+
+function publishWidgetsChanged(action: 'create' | 'update' | 'delete', uuid?: string) {
+  publishAppEvent({ type: 'widgets:changed', source: 'maintenance-api', entity: 'widget', action, uuid })
+}
+
+function publishDashboardChanged(action: 'create' | 'update' | 'delete' | 'refresh', uuid?: string) {
+  publishAppEvent({ type: 'dashboard:changed', source: 'maintenance-api', entity: 'dashboard', action, uuid })
+}
 
 export type MaintenanceModuleDto = {
   uuid: string
@@ -108,21 +121,30 @@ export function createProvider(input: Record<string, unknown>) {
   return graphqlRequest<{ createProvider: { uuid: string } }>(
     graphqlOperationIds.createProvider,
     { input }
-  )
+  ).then((data) => {
+    publishRecordsChanged('provider', 'create', data.createProvider.uuid)
+    return data
+  })
 }
 
 export function updateProvider(input: Record<string, unknown>) {
   return graphqlRequest<{ updateProvider: { uuid: string } }>(
     graphqlOperationIds.updateProvider,
     { input }
-  )
+  ).then((data) => {
+    publishRecordsChanged('provider', 'update', data.updateProvider.uuid)
+    return data
+  })
 }
 
 export function removeProvider(uuid: string) {
   return graphqlRequest<{ removeProvider: boolean }>(
     graphqlOperationIds.removeProvider,
     { uuid }
-  )
+  ).then((data) => {
+    publishRecordsChanged('provider', 'delete', uuid)
+    return data
+  })
 }
 
 // ─── Products ───────────────────────────────────────────
@@ -147,7 +169,10 @@ export function createProduct(input: Record<string, unknown>) {
   return graphqlRequest<{ createProduct: { uuid: string } }>(
     graphqlOperationIds.createProduct,
     { input: { ...rest, providerId: providerUuid } }
-  )
+  ).then((data) => {
+    publishRecordsChanged('product', 'create', data.createProduct.uuid)
+    return data
+  })
 }
 
 export function updateProduct(input: Record<string, unknown>) {
@@ -155,14 +180,20 @@ export function updateProduct(input: Record<string, unknown>) {
   return graphqlRequest<{ updateProduct: { uuid: string } }>(
     graphqlOperationIds.updateProduct,
     { input: { ...rest, providerId: providerUuid } }
-  )
+  ).then((data) => {
+    publishRecordsChanged('product', 'update', data.updateProduct.uuid)
+    return data
+  })
 }
 
 export function removeProduct(uuid: string) {
   return graphqlRequest<{ removeProduct: boolean }>(
     graphqlOperationIds.removeProduct,
     { uuid }
-  )
+  ).then((data) => {
+    publishRecordsChanged('product', 'delete', uuid)
+    return data
+  })
 }
 
 // ─── Clients ────────────────────────────────────────────
@@ -188,21 +219,30 @@ export function createClient(input: Record<string, unknown>) {
   return graphqlRequest<{ createClient: { uuid: string } }>(
     graphqlOperationIds.createClient,
     { input }
-  )
+  ).then((data) => {
+    publishRecordsChanged('client', 'create', data.createClient.uuid)
+    return data
+  })
 }
 
 export function updateClient(input: Record<string, unknown>) {
   return graphqlRequest<{ updateClient: { uuid: string } }>(
     graphqlOperationIds.updateClient,
     { input }
-  )
+  ).then((data) => {
+    publishRecordsChanged('client', 'update', data.updateClient.uuid)
+    return data
+  })
 }
 
 export function removeClient(uuid: string) {
   return graphqlRequest<{ removeClient: boolean }>(
     graphqlOperationIds.removeClient,
     { uuid }
-  )
+  ).then((data) => {
+    publishRecordsChanged('client', 'delete', uuid)
+    return data
+  })
 }
 
 // ─── Policies ───────────────────────────────────────────
@@ -269,21 +309,30 @@ export function createTag(input: Record<string, unknown>) {
   return graphqlRequest<{ createTag: { uuid: string } }>(
     graphqlOperationIds.createTag,
     { input }
-  )
+  ).then((data) => {
+    publishRecordsChanged('tag', 'create', data.createTag.uuid)
+    return data
+  })
 }
 
 export function updateTag(input: Record<string, unknown>) {
   return graphqlRequest<{ updateTag: { uuid: string } }>(
     graphqlOperationIds.updateTag,
     { input }
-  )
+  ).then((data) => {
+    publishRecordsChanged('tag', 'update', data.updateTag.uuid)
+    return data
+  })
 }
 
 export function removeTag(uuid: string) {
   return graphqlRequest<{ removeTag: boolean }>(
     graphqlOperationIds.removeTag,
     { uuid }
-  )
+  ).then((data) => {
+    publishRecordsChanged('tag', 'delete', uuid)
+    return data
+  })
 }
 
 // ─── Case Detail ─────────────────────────────────────────
@@ -352,21 +401,30 @@ export function createPolicy(input: any) {
   return graphqlRequest<{ createPolicy: any }>(
     graphqlOperationIds.createPolicy,
     { input }
-  ).then((data) => data.createPolicy)
+  ).then((data) => {
+    publishRecordsChanged('policy', 'create', data.createPolicy?.uuid)
+    return data.createPolicy
+  })
 }
 
 export function updatePolicy(input: any) {
   return graphqlRequest<{ updatePolicy: any }>(
     graphqlOperationIds.updatePolicy,
     { input }
-  ).then((data) => data.updatePolicy)
+  ).then((data) => {
+    publishRecordsChanged('policy', 'update', data.updatePolicy?.uuid ?? input.uuid)
+    return data.updatePolicy
+  })
 }
 
 export function removePolicy(uuid: string) {
   return graphqlRequest<{ removePolicy: boolean }>(
     graphqlOperationIds.removePolicy,
     { uuid }
-  ).then((data) => data.removePolicy)
+  ).then((data) => {
+    publishRecordsChanged('policy', 'delete', uuid)
+    return data.removePolicy
+  })
 }
 
 // ─── Cases CRUD & Comments ──────────────────────────────
@@ -375,21 +433,32 @@ export function createCase(input: any) {
   return graphqlRequest<{ createCase: any }>(
     graphqlOperationIds.createCase,
     { input }
-  ).then((data) => data.createCase)
+  ).then((data) => {
+    publishRecordsChanged('case', 'create', data.createCase?.uuid)
+    publishAppEvent({ type: 'notifications:refresh', source: 'maintenance-api', entity: 'notification', action: 'refresh' })
+    return data.createCase
+  })
 }
 
 export function updateCase(input: any) {
   return graphqlRequest<{ updateCase: any }>(
     graphqlOperationIds.updateCase,
     { input }
-  ).then((data) => data.updateCase)
+  ).then((data) => {
+    publishRecordsChanged('case', 'update', data.updateCase?.uuid ?? input.uuid)
+    publishAppEvent({ type: 'notifications:refresh', source: 'maintenance-api', entity: 'notification', action: 'refresh' })
+    return data.updateCase
+  })
 }
 
 export function removeCase(uuid: string) {
   return graphqlRequest<{ removeCase: boolean }>(
     graphqlOperationIds.removeCase,
     { uuid }
-  ).then((data) => data.removeCase)
+  ).then((data) => {
+    publishRecordsChanged('case', 'delete', uuid)
+    return data.removeCase
+  })
 }
 
 export function addCommentApi(caseId: string, body: string, internalOnly: boolean) {
@@ -430,14 +499,20 @@ export function saveUserDashboardApi(name: string, config: string) {
   return graphqlRequest<{ saveUserDashboard: UserDashboardDto }>(
     graphqlOperationIds.saveUserDashboard,
     { name, config }
-  ).then((data) => data.saveUserDashboard)
+  ).then((data) => {
+    publishDashboardChanged('update', data.saveUserDashboard.uuid)
+    return data.saveUserDashboard
+  })
 }
 
 export function removeUserDashboardApi(name: string) {
   return graphqlRequest<{ removeUserDashboard: boolean }>(
     graphqlOperationIds.removeUserDashboard,
     { name }
-  ).then((data) => data.removeUserDashboard)
+  ).then((data) => {
+    publishDashboardChanged('delete')
+    return data.removeUserDashboard
+  })
 }
 
 // ─── Widgets CRUD ───────────────────────────────────────
@@ -462,28 +537,40 @@ export function createWidget(input: Record<string, unknown>) {
   return graphqlRequest<{ createWidget: { uuid: string } }>(
     graphqlOperationIds.createWidget,
     { input }
-  )
+  ).then((data) => {
+    publishWidgetsChanged('create', data.createWidget.uuid)
+    return data
+  })
 }
 
 export function updateWidget(input: Record<string, unknown>) {
   return graphqlRequest<{ updateWidget: { uuid: string } }>(
     graphqlOperationIds.updateWidget,
     { input }
-  )
+  ).then((data) => {
+    publishWidgetsChanged('update', data.updateWidget.uuid)
+    return data
+  })
 }
 
 export function removeWidget(uuid: string) {
   return graphqlRequest<{ removeWidget: boolean }>(
     graphqlOperationIds.removeWidget,
     { uuid }
-  )
+  ).then((data) => {
+    publishWidgetsChanged('delete', uuid)
+    return data
+  })
 }
 
 export function setPrimaryDashboardApi(name: string) {
   return graphqlRequest<{ setPrimaryDashboard: { uuid: string; name: string; isPrimary: boolean } }>(
     graphqlOperationIds.setPrimaryDashboard,
     { name }
-  ).then((data) => data.setPrimaryDashboard)
+  ).then((data) => {
+    publishDashboardChanged('update', data.setPrimaryDashboard.uuid)
+    return data.setPrimaryDashboard
+  })
 }
 
 export type SystemHealthDto = {

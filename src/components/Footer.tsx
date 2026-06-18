@@ -35,7 +35,7 @@ export function Footer() {
         <Stack spacing={3.5}>
           <Box className="grid gap-5 lg:grid-cols-[1fr_1.5fr]">
             <Box>
-              <Typography variant="h6">Informacion corporativa</Typography>
+              <Typography variant="h6">Información corporativa</Typography>
               <Typography variant="body2" color="text.secondary" className="mt-1 max-w-xl">
                 Canales oficiales de comunicacion para clientes, usuarios y personal autorizado.
               </Typography>

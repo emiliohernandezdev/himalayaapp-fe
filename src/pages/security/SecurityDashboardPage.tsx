@@ -14,7 +14,7 @@ const securityTiles = [
   },
   {
     title: 'Roles',
-    description: 'Agrupaciones de permisos y jerarquias de autorizacion.',
+    description: 'Agrupaciones de permisos y jerarquías de autorización.',
     icon: ShieldCheck,
     status: 'Base',
     route: '/security/roles',

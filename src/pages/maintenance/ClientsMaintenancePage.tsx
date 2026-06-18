@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, TextField, Typography } from '@mui/material'
 import type { GridColDef } from '@mui/x-data-grid'
 import { Edit2, MoreVertical, Plus, Trash2, UsersRound, Shield, FileText } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
@@ -15,16 +15,19 @@ import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { clientStatusLabels, clientTypeLabels, esESGrid, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 
+const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((val) => (val === '' ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
+
 const clientSchema = z.object({
   displayName: z.string().min(2, 'Mínimo 2 caracteres'),
   type: z.enum(['Individual', 'Company']),
   status: z.enum(['Active', 'Inactive', 'Prospect']),
-  taxId: z.string().optional(),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  department: z.string().optional(),
+  taxId: emptyToUndefined(z.string().optional()),
+  email: emptyToUndefined(z.string().email('Email inválido').optional()),
+  phone: emptyToUndefined(z.string().optional()),
+  address: emptyToUndefined(z.string().optional()),
+  city: emptyToUndefined(z.string().optional()),
+  department: emptyToUndefined(z.string().optional()),
 })
 
 type ClientFormData = z.infer<typeof clientSchema>
@@ -60,6 +63,17 @@ export function ClientsMaintenancePage() {
     reset({ displayName: '', type: 'Individual', status: 'Active', taxId: '', email: '', phone: '', address: '', city: '', department: '' })
     setDialogOpen(true)
   }
+
+  useEffect(() => {
+    const handleSherpaAction = (e: Event) => {
+      const customEvent = e as CustomEvent
+      if (customEvent.detail?.type === 'create-client') {
+        openCreate()
+      }
+    }
+    window.addEventListener('sherpa-action', handleSherpaAction)
+    return () => window.removeEventListener('sherpa-action', handleSherpaAction)
+  }, [reset])
 
   const openEdit = () => {
     if (!selected) return
@@ -246,25 +260,25 @@ export function ClientsMaintenancePage() {
                 )} />
               </Stack>
               <Controller name="taxId" control={control} render={({ field }) => (
-                <TextField {...field} label="NIT / DPI" fullWidth />
+                <TextField {...field} label="NIT / DPI" fullWidth error={!!errors.taxId} helperText={errors.taxId?.message?.toString() ?? ' '} />
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="email" control={control} render={({ field }) => (
-                  <TextField {...field} label="Email" fullWidth error={!!errors.email} helperText={errors.email?.message ?? ' '} />
+                  <TextField {...field} label="Email" fullWidth error={!!errors.email} helperText={errors.email?.message?.toString() ?? ' '} />
                 )} />
                 <Controller name="phone" control={control} render={({ field }) => (
-                  <TextField {...field} label="Teléfono" fullWidth />
+                  <TextField {...field} label="Teléfono" fullWidth error={!!errors.phone} helperText={errors.phone?.message?.toString() ?? ' '} />
                 )} />
               </Stack>
               <Controller name="address" control={control} render={({ field }) => (
-                <TextField {...field} label="Dirección" fullWidth />
+                <TextField {...field} label="Dirección" fullWidth error={!!errors.address} helperText={errors.address?.message?.toString() ?? ' '} />
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="city" control={control} render={({ field }) => (
-                  <TextField {...field} label="Ciudad" fullWidth />
+                  <TextField {...field} label="Ciudad" fullWidth error={!!errors.city} helperText={errors.city?.message?.toString() ?? ' '} />
                 )} />
                 <Controller name="department" control={control} render={({ field }) => (
-                  <TextField {...field} label="Departamento" fullWidth />
+                  <TextField {...field} label="Departamento" fullWidth error={!!errors.department} helperText={errors.department?.message?.toString() ?? ' '} />
                 )} />
               </Stack>
             </Stack>

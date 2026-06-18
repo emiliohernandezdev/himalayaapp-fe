@@ -17,18 +17,21 @@ import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { esESGrid, policyStatusLabels, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 
+const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((val) => (val === '' || val == null ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
+
 const policySchema = z.object({
   policyNumber: z.string().min(2, 'El número de póliza es requerido'),
   status: z.enum(['Active', 'Draft', 'Expired', 'Cancelled', 'PendingRenewal']),
   startDate: z.string().min(1, 'La fecha de inicio es requerida'),
   endDate: z.string().min(1, 'La fecha de vencimiento es requerida'),
-  insuredAmount: z.any().optional(),
-  premiumAmount: z.any().optional(),
+  insuredAmount: emptyToUndefined(z.coerce.number().min(0, 'Debe ser mayor o igual a 0').optional()),
+  premiumAmount: emptyToUndefined(z.coerce.number().min(0, 'Debe ser mayor o igual a 0').optional()),
   currency: z.string().min(1, 'Selecciona una moneda'),
   clientUuid: z.string().min(1, 'Selecciona un cliente'),
   providerUuid: z.string().min(1, 'Selecciona un proveedor'),
   productUuid: z.string().min(1, 'Selecciona un producto'),
-  notes: z.string().optional(),
+  notes: emptyToUndefined(z.string().optional()),
 })
 
 type PolicyFormData = z.infer<typeof policySchema>
@@ -126,6 +129,17 @@ export function PoliciesMaintenancePage() {
     })
     setDialogOpen(true)
   }
+
+  useEffect(() => {
+    const handleSherpaAction = (e: Event) => {
+      const customEvent = e as CustomEvent
+      if (customEvent.detail?.type === 'create-policy') {
+        openCreate()
+      }
+    }
+    window.addEventListener('sherpa-action', handleSherpaAction)
+    return () => window.removeEventListener('sherpa-action', handleSherpaAction)
+  }, [reset])
 
   const openEdit = () => {
     if (!selected) return
@@ -480,15 +494,15 @@ export function PoliciesMaintenancePage() {
 
               <Stack direction="row" spacing={2}>
                 <Controller name="insuredAmount" control={control} render={({ field }) => (
-                  <TextField {...field} type="number" label="Suma Asegurada" fullWidth error={!!errors.insuredAmount} helperText={(errors.insuredAmount as any)?.message ?? ' '} />
+                  <TextField {...field} value={field.value ?? ''} type="number" label="Suma Asegurada" fullWidth error={!!errors.insuredAmount} helperText={(errors.insuredAmount as any)?.message ?? ' '} />
                 )} />
                 <Controller name="premiumAmount" control={control} render={({ field }) => (
-                  <TextField {...field} type="number" label="Prima Anual" fullWidth error={!!errors.premiumAmount} helperText={(errors.premiumAmount as any)?.message ?? ' '} />
+                  <TextField {...field} value={field.value ?? ''} type="number" label="Prima Anual" fullWidth error={!!errors.premiumAmount} helperText={(errors.premiumAmount as any)?.message ?? ' '} />
                 )} />
               </Stack>
 
               <Controller name="notes" control={control} render={({ field }) => (
-                <TextField {...field} label="Notas / Observaciones" multiline rows={3} fullWidth error={!!errors.notes} helperText={(errors.notes as any)?.message ?? ' '} />
+                <TextField {...field} value={field.value ?? ''} label="Notas / Observaciones" multiline rows={3} fullWidth error={!!errors.notes} helperText={(errors.notes as any)?.message ?? ' '} />
               )} />
             </Stack>
           </DialogContent>

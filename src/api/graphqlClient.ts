@@ -1,4 +1,7 @@
+import axios, { AxiosError } from 'axios'
 import { useAuthStore } from '../store/useAuthStore'
+import { useErrorStore } from '../store/useErrorStore'
+import { graphqlOperationIds } from './graphqlOperationIds'
 import type { GraphqlOperationId } from './graphqlOperationIds'
 
 const graphqlEndpoint = import.meta.env.VITE_GRAPHQL_URL ?? 'http://localhost:3000/graphql'
@@ -19,37 +22,55 @@ export async function graphqlRequest<TData>(operationId: GraphqlOperationId, var
     headers.Authorization = `Bearer ${token}`
   }
 
-  let response: Response
+  let payload: GraphqlResponse<TData>
   try {
-    response = await fetch(graphqlEndpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
+    const response = await axios.post<GraphqlResponse<TData>>(
+      graphqlEndpoint,
+      {
         variables,
         extensions: {
           operationId,
         },
-      }),
-    })
+      },
+      { headers },
+    )
+    payload = response.data
   } catch (error) {
+    const status = error instanceof AxiosError ? error.response?.status : undefined
+
+    if (status === 401) {
+      if (operationId !== graphqlOperationIds.verifySupervisorAuthorization) {
+        useAuthStore.getState().logout(true)
+        throw new Error(sessionExpiredMessage)
+      }
+      throw new Error('Credenciales de supervisor incorrectas o no cuenta con permisos.')
+    }
+
+    if (status === 404) {
+      useErrorStore.getState().setError('404')
+      throw new Error('Recurso no encontrado (404)')
+    }
+
+    if (status && status >= 500) {
+      useErrorStore.getState().setError('500')
+      throw new Error('Error interno del servidor (500)')
+    }
+
+    if (status) {
+      throw new Error('No se pudo completar la solicitud.')
+    }
+
+    useErrorStore.getState().setError('500')
     throw new Error('No se pudo conectar con el servidor. Por favor, verifica que el servicio esté activo o inténtalo más tarde.')
   }
 
-  if (response.status === 401) {
-    useAuthStore.getState().logout()
-    throw new Error(sessionExpiredMessage)
-  }
-
-  if (!response.ok) {
-    throw new Error('No se pudo completar la solicitud.')
-  }
-
-  const payload = (await response.json()) as GraphqlResponse<TData>
-
   if (payload.errors?.length) {
     if (payload.errors.some((error) => /unauthorized|unauthenticated|jwt|forbidden/i.test(error.message))) {
-      useAuthStore.getState().logout()
-      throw new Error(sessionExpiredMessage)
+      if (operationId !== graphqlOperationIds.verifySupervisorAuthorization) {
+        useAuthStore.getState().logout(true)
+        throw new Error(sessionExpiredMessage)
+      }
+      throw new Error('Credenciales de supervisor incorrectas o no cuenta con permisos.')
     }
 
     throw new Error(payload.errors.map((error) => error.message).join('\n'))

@@ -3,6 +3,7 @@ import { Alert, Autocomplete, Avatar, Box, Button, Checkbox, Chip, CircularProgr
 import type { GridColDef } from '@mui/x-data-grid'
 import { ClipboardCheck, Clock, Edit2, MessageSquare, MoreVertical, Plus, Trash2, X, Eye, EyeOff } from 'lucide-react'
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useParams } from 'react-router'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
@@ -14,8 +15,10 @@ import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
 import { ResponsiveDataGrid } from '../../components/ResponsiveDataGrid'
 import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
+import { useAuthStore } from '../../store/useAuthStore'
 import { casePriorityLabels, caseStatusLabels, caseTypeLabels, esESGrid, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
+import { subscribeAppEvent } from '../../utils/appEvents'
 
 /** Sanitize backend errors for user display */
 function friendlyError(err: any, fallback = 'Ocurrió un error inesperado.'): string {
@@ -128,16 +131,19 @@ function PriorityChip({ priority }: { priority: string }) {
   return <Chip label={t(casePriorityLabels, priority)} size="small" sx={{ fontWeight: 600, ...c }} />
 }
 
+const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((val) => (val === '' ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
+
 const caseSchema = z.object({
   title: z.string().min(2, 'El título es requerido'),
-  description: z.string().optional(),
+  description: emptyToUndefined(z.string().optional()),
   status: z.enum(['Pending', 'InProgress', 'WaitingForClient', 'WaitingForProvider', 'Closed', 'Cancelled']),
   priority: z.enum(['Low', 'Medium', 'High', 'Urgent']),
   type: z.enum(['Claim', 'Renewal', 'Endorsement', 'Payment', 'Documentation', 'GeneralSupport']),
-  dueAt: z.string().optional().or(z.literal('')),
+  dueAt: emptyToUndefined(z.string().optional()),
   clientId: z.string().min(1, 'Selecciona un cliente'),
-  policyId: z.string().optional().or(z.literal('')),
-  assignedUserId: z.string().optional().or(z.literal('')),
+  policyId: emptyToUndefined(z.string().optional()),
+  assignedUserId: emptyToUndefined(z.string().optional()),
   tagUuids: z.array(z.string()),
 })
 
@@ -166,6 +172,13 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
 
   const canEditCase = usePermission('edit_case')
   const canDeleteCase = usePermission('delete_case')
+
+  const { user } = useAuthStore()
+  const hasSupervisorPrivileges = useMemo(() => {
+    if (!user) return false
+    const privilegedRoles = ['manager', 'supervisor', 'administrator', 'owner']
+    return user.roles.some((role) => privilegedRoles.includes(role.toLowerCase()))
+  }, [user])
 
   // Closing case states
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
@@ -198,10 +211,13 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
   }
 
   const handleCloseCaseSubmit = async () => {
-    if (!caseUuid || !closeReason.trim() || !supervisorEmail || !supervisorPassword) return
+    if (!caseUuid || !closeReason.trim()) return
+    if (!hasSupervisorPrivileges && (!supervisorEmail || !supervisorPassword)) return
     setIsSubmittingClose(true)
     try {
-      await verifySupervisorAuthorizationApi(supervisorEmail, supervisorPassword)
+      if (!hasSupervisorPrivileges) {
+        await verifySupervisorAuthorizationApi(supervisorEmail, supervisorPassword)
+      }
       await addCommentApi(caseUuid, `Razón de cierre: ${closeReason}`, false)
       await updateCase({ uuid: caseUuid, status: 'Closed' })
       toast.success('Caso cerrado exitosamente')
@@ -558,71 +574,160 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
                   type: 'Tipo',
                   dueAt: 'Fecha Límite',
                   clientUuid: 'Cliente',
+                  client: 'Cliente',
                   policyUuid: 'Póliza',
+                  policy: 'Póliza',
                   assignedUserUuid: 'Responsable Asignado',
+                  assignedUser: 'Responsable Asignado',
                   tagUuids: 'Etiquetas',
+                  tags: 'Etiquetas',
                   closedAt: 'Fecha de Cierre',
+                  createdAt: 'Fecha de Creación',
+                  deletedAt: 'Fecha de Eliminación',
+                  caseNumber: 'Número de Caso',
+                  version: 'Versión',
                 }
 
-                const formatValue = (key: string, val: any) => {
-                  if (val === null || val === undefined || val === '') return '—'
-                  if (key === 'status') return t(caseStatusLabels, val)
-                  if (key === 'priority') return t(casePriorityLabels, val)
-                  if (key === 'type') return t(caseTypeLabels, val)
-                  if (key === 'dueAt' || key === 'closedAt') return formatDate(val)
-                  if (key === 'clientUuid') {
-                    const c = (clients ?? []).find((item) => item.uuid === val)
-                    return c ? c.displayName : 'Cliente Desconocido'
+                const renderDiffValue = (key: string, val: any) => {
+                  if (val === null || val === undefined || val === '') return <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography>
+                  
+                  if (key === 'status') {
+                    return <StatusChip status={val} />
                   }
-                  if (key === 'policyUuid') {
-                    const p = (policies ?? []).find((item) => item.uuid === val)
-                    return p ? p.policyNumber : 'Póliza Desconocida'
+                  if (key === 'priority') {
+                    return <PriorityChip priority={val} />
                   }
-                  if (key === 'assignedUserUuid') {
-                    const u = (users ?? []).find((item) => item.uuid === val)
-                    return u ? `${u.firstName} ${u.lastName}` : 'No Asignado'
+                  if (key === 'type') {
+                    return <Chip label={t(caseTypeLabels, val)} size="small" sx={{ bgcolor: 'action.hover', color: 'text.primary' }} />
                   }
-                  if (key === 'tagUuids') {
-                    if (Array.isArray(val)) {
-                      const names = val.map((uuid) => {
-                        const tag = (tags ?? []).find((t) => t.uuid === uuid)
-                        return tag ? tag.name : uuid
-                      })
-                      return names.length > 0 ? names.join(', ') : 'Sin etiquetas'
+                  if (key === 'dueAt' || key === 'closedAt') {
+                    return <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatDate(val)}</Typography>
+                  }
+                  if (key === 'clientUuid' || key === 'client') {
+                    let displayName = 'Cliente Desconocido'
+                    if (typeof val === 'object' && val !== null && 'displayName' in val) {
+                      displayName = val.displayName
+                    } else {
+                      const c = (clients ?? []).find((item) => item.uuid === val)
+                      if (c) displayName = c.displayName
                     }
+                    return (
+                      <Chip
+                        avatar={<Avatar sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', fontSize: '10px' }}>{displayName[0]?.toUpperCase()}</Avatar>}
+                        label={displayName}
+                        size="small"
+                        variant="outlined"
+                      />
+                    )
                   }
-                  return String(val)
+                  if (key === 'policyUuid' || key === 'policy') {
+                    let policyNumber = 'Póliza Desconocida'
+                    if (typeof val === 'object' && val !== null && 'policyNumber' in val) {
+                      policyNumber = val.policyNumber
+                    } else {
+                      const p = (policies ?? []).find((item) => item.uuid === val)
+                      if (p) policyNumber = p.policyNumber
+                    }
+                    return (
+                      <Chip
+                        label={policyNumber}
+                        size="small"
+                        variant="outlined"
+                        color="secondary"
+                      />
+                    )
+                  }
+                  if (key === 'assignedUserUuid' || key === 'assignedUser') {
+                    let fullName = 'No Asignado'
+                    let initialsStr = '?'
+                    if (typeof val === 'object' && val !== null && 'firstName' in val) {
+                      fullName = `${val.firstName} ${val.lastName}`
+                      initialsStr = `${val.firstName?.[0] ?? ''}${val.lastName?.[0] ?? ''}`.toUpperCase()
+                    } else {
+                      const u = (users ?? []).find((item) => item.uuid === val)
+                      if (u) {
+                        fullName = `${u.firstName} ${u.lastName}`
+                        initialsStr = `${u.firstName?.[0] ?? ''}${u.lastName?.[0] ?? ''}`.toUpperCase()
+                      }
+                    }
+                    return (
+                      <Chip
+                        avatar={<Avatar sx={{ bgcolor: 'info.main', color: 'info.contrastText', fontSize: '10px' }}>{initialsStr}</Avatar>}
+                        label={fullName}
+                        size="small"
+                        variant="outlined"
+                      />
+                    )
+                  }
+                  if (key === 'tagUuids' || key === 'tags') {
+                    const tagArray = Array.isArray(val) ? val : []
+                    if (tagArray.length === 0) return <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography>
+                    return (
+                      <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                        {tagArray.map((item, idx) => {
+                          let name = String(item)
+                          let colorStr = '#075985'
+                          if (typeof item === 'object' && item !== null && 'name' in item) {
+                            name = item.name
+                            colorStr = item.color || colorStr
+                          } else {
+                            const tag = (tags ?? []).find((t) => t.uuid === item)
+                            if (tag) {
+                              name = tag.name
+                              colorStr = tag.color
+                            }
+                          }
+                          return (
+                            <Chip
+                              key={idx}
+                              label={name}
+                              size="small"
+                              sx={{ bgcolor: colorStr, color: '#fff', fontWeight: 600, fontSize: '0.7rem', height: 20 }}
+                            />
+                          )
+                        })}
+                      </Stack>
+                    )
+                  }
+                  return <Typography variant="body2" sx={{ fontWeight: 600 }}>{String(val)}</Typography>
                 }
 
-                const keys = Object.keys(afterObj).filter((k) => k !== 'uuid' && k !== 'updatedAt')
+                const keys = Object.keys(afterObj).filter((k) => {
+                  if (k === 'uuid' || k === 'updatedAt' || k === 'createdAt' || k === 'deletedAt' || k === 'version') return false
+                  const beforeVal = beforeObj[k]
+                  const afterVal = afterObj[k]
+                  const hasBefore = beforeVal !== null && beforeVal !== undefined && beforeVal !== ''
+                  const hasAfter = afterVal !== null && afterVal !== undefined && afterVal !== ''
+                  if (Array.isArray(beforeVal) && beforeVal.length === 0 && !hasAfter) return false
+                  if (Array.isArray(afterVal) && afterVal.length === 0 && !hasBefore) return false
+                  return hasBefore || hasAfter
+                })
+
                 if (keys.length === 0) return null
 
                 return (
-                  <Stack spacing={0.75} sx={{ mt: 1, p: 1.25, bgcolor: 'action.hover', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                  <Stack spacing={1} sx={{ mt: 1.5, p: 2, bgcolor: 'background.paper', borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                     {keys.map((key) => {
                       const label = fieldLabels[key] ?? key
-                      const beforeVal = formatValue(key, beforeObj[key])
-                      const afterVal = formatValue(key, afterObj[key])
-
                       return (
-                        <Box key={key} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                        <Box key={key} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' } }}>
                           <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                             {label}
                           </Typography>
                           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                            {beforeStr && (
+                            {beforeStr && beforeObj[key] !== undefined && beforeObj[key] !== null && beforeObj[key] !== '' && (
                               <>
-                                <Typography variant="body2" sx={{ color: 'text.secondary', textDecoration: 'line-through', fontSize: '0.78rem' }}>
-                                  {beforeVal}
-                                </Typography>
+                                <Box sx={{ opacity: 0.65 }}>
+                                  {renderDiffValue(key, beforeObj[key])}
+                                </Box>
                                 <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
                                   →
                                 </Typography>
                               </>
                             )}
-                            <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.78rem' }}>
-                              {afterVal}
-                            </Typography>
+                            <Box>
+                              {renderDiffValue(key, afterObj[key])}
+                            </Box>
                           </Stack>
                         </Box>
                       )
@@ -694,43 +799,47 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
               autoFocus
               placeholder="Ej. Se resolvió el reclamo y se notificó al cliente."
             />
-            <TextField
-              select
-              label="Supervisor *"
-              value={supervisorEmail}
-              onChange={(event) => setSupervisorEmail(event.target.value)}
-              fullWidth
-              helperText="Requiere autorizacion de un usuario con jerarquia superior."
-            >
-              {supervisorUsers.map((user) => (
-                <MenuItem key={user.uuid} value={user.email}>
-                  {user.firstName} {user.lastName} ({user.email})
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              label="Contraseña del supervisor *"
-              type={showSupervisorPassword ? 'text' : 'password'}
-              value={supervisorPassword}
-              onChange={(event) => setSupervisorPassword(event.target.value)}
-              fullWidth
-              autoComplete="current-password"
-              slotProps={{
-                input: {
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={() => setShowSupervisorPassword(!showSupervisorPassword)}
-                        edge="end"
-                      >
-                        {showSupervisorPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }
-              }}
-            />
+            {!hasSupervisorPrivileges && (
+              <>
+                <TextField
+                  select
+                  label="Supervisor *"
+                  value={supervisorEmail}
+                  onChange={(event) => setSupervisorEmail(event.target.value)}
+                  fullWidth
+                  helperText="Requiere autorización de un usuario con jerarquía superior."
+                >
+                  {supervisorUsers.map((user) => (
+                    <MenuItem key={user.uuid} value={user.email}>
+                      {user.firstName} {user.lastName} ({user.email})
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  label="Contraseña del supervisor *"
+                  type={showSupervisorPassword ? 'text' : 'password'}
+                  value={supervisorPassword}
+                  onChange={(event) => setSupervisorPassword(event.target.value)}
+                  fullWidth
+                  autoComplete="current-password"
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            aria-label="toggle password visibility"
+                            onClick={() => setShowSupervisorPassword(!showSupervisorPassword)}
+                            edge="end"
+                          >
+                            {showSupervisorPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                          </IconButton>
+                        </InputAdornment>
+                      )
+                    }
+                  }}
+                />
+              </>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
@@ -740,7 +849,7 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
           <Button
             variant="contained"
             color="success"
-            disabled={isSubmittingClose || !closeReason.trim() || !supervisorEmail || !supervisorPassword}
+            disabled={isSubmittingClose || !closeReason.trim() || (!hasSupervisorPrivileges && (!supervisorEmail || !supervisorPassword))}
             onClick={handleCloseCaseSubmit}
             startIcon={isSubmittingClose ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
@@ -755,6 +864,7 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
 // ─── Cases Main Page ─────────────────────────────────────
 
 export function CasesMaintenancePage() {
+  const { id } = useParams()
   const { data: cases, error, loading, refetch } = useApiQuery('cases', fetchCases)
   const canViewCases = usePermission('view_cases')
   const canCreateCase = usePermission('create_case')
@@ -768,6 +878,19 @@ export function CasesMaintenancePage() {
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
   const [drawerCaseId, setDrawerCaseId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setDrawerCaseId(id ?? null)
+  }, [id])
+
+  useEffect(() => {
+    return subscribeAppEvent('records:changed', (event) => {
+      if (!event.entity || event.entity === 'case') {
+        refetch()
+      }
+    })
+  }, [refetch])
+
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
@@ -802,6 +925,7 @@ export function CasesMaintenancePage() {
       title: '',
       description: '',
       status: 'Pending',
+      selectedCase: null,
       priority: 'Medium',
       type: 'GeneralSupport',
       dueAt: '',
@@ -809,9 +933,22 @@ export function CasesMaintenancePage() {
       policyId: '',
       assignedUserId: '',
       tagUuids: [],
-    })
+    } as any)
     setDialogOpen(true)
   }
+
+  useEffect(() => {
+    const handleSherpaAction = (e: Event) => {
+      const customEvent = e as CustomEvent
+      if (customEvent.detail?.type === 'open-case' && customEvent.detail?.uuid) {
+        setDrawerCaseId(customEvent.detail.uuid)
+      } else if (customEvent.detail?.type === 'create-case') {
+        openCreate()
+      }
+    }
+    window.addEventListener('sherpa-action', handleSherpaAction)
+    return () => window.removeEventListener('sherpa-action', handleSherpaAction)
+  }, [])
 
   const openEdit = (c: CaseRaw | CaseDetail) => {
     setSelectedCase(c)
@@ -1059,11 +1196,11 @@ export function CasesMaintenancePage() {
           <DialogContent dividers sx={{ borderColor: 'divider' }}>
             <Stack spacing={3} sx={{ mt: 1 }}>
               <Controller name="title" control={control} render={({ field }) => (
-                <TextField {...field} label="Título del Caso *" fullWidth error={!!errors.title} helperText={errors.title?.message ?? ' '} />
+                <TextField {...field} value={field.value ?? ''} label="Título del Caso *" fullWidth error={!!errors.title} helperText={errors.title?.message?.toString() ?? ' '} />
               )} />
 
               <Controller name="description" control={control} render={({ field }) => (
-                <TextField {...field} label="Descripción" multiline rows={3} fullWidth error={!!errors.description} helperText={errors.description?.message ?? ' '} />
+                <TextField {...field} value={field.value ?? ''} label="Descripción" multiline rows={3} fullWidth error={!!errors.description} helperText={errors.description?.message?.toString() ?? ' '} />
               )} />
 
               <Stack direction="row" spacing={2}>
@@ -1113,7 +1250,7 @@ export function CasesMaintenancePage() {
                         textField: {
                           fullWidth: true,
                           error: !!errors.dueAt,
-                          helperText: errors.dueAt?.message ?? ' ',
+                          helperText: errors.dueAt?.message?.toString() ?? ' ',
                         },
                       }}
                     />
@@ -1132,7 +1269,7 @@ export function CasesMaintenancePage() {
                     noOptionsText="Sin resultados"
                     fullWidth
                     renderInput={(params) => (
-                      <TextField {...params} label="Cliente *" error={!!errors.clientId} helperText={errors.clientId?.message ?? ' '} />
+                      <TextField {...params} label="Cliente *" error={!!errors.clientId} helperText={errors.clientId?.message?.toString() ?? ' '} />
                     )}
                   />
                 )} />
@@ -1154,7 +1291,7 @@ export function CasesMaintenancePage() {
                           {...restParams}
                           label="Póliza Asociada"
                           error={!!errors.policyId}
-                          helperText={errors.policyId?.message ?? ' '}
+                          helperText={errors.policyId?.message?.toString() ?? ' '}
                           slotProps={{
                             ...slotProps,
                             input: {
@@ -1184,7 +1321,7 @@ export function CasesMaintenancePage() {
                   noOptionsText="Sin resultados"
                   fullWidth
                   renderInput={(params) => (
-                    <TextField {...params} label="Responsable Asignado" error={!!errors.assignedUserId} helperText={errors.assignedUserId?.message ?? ' '} />
+                    <TextField {...params} label="Responsable Asignado" error={!!errors.assignedUserId} helperText={errors.assignedUserId?.message?.toString() ?? ' '} />
                   )}
                   renderOption={(props: React.HTMLAttributes<HTMLLIElement> & { key: React.Key }, option: UserRaw) => {
                     const { key, ...optionProps } = props;

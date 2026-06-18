@@ -55,6 +55,10 @@ export const graphqlOperationIds = {
   setPrimaryDashboard: 'aa00100100100124',
   systemHealth: 'aa00100100100125',
   dashboardWidgetData: 'aa00100100100126',
+  askSummitAI: 'aa00100100100127',
+  myNotifications: 'aa00100100100128',
+  markNotificationRead: 'aa00100100100129',
+  markAllNotificationsRead: 'aa00100100100130',
 } as const
 
 export type GraphqlOperationId =

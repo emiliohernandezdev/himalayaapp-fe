@@ -1,9 +1,15 @@
 import { Box, Container } from '@mui/material'
 import type { PaletteMode } from '@mui/material/styles'
+import { useEffect } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { Footer } from './Footer'
 import { Navbar } from './Navbar'
 import { useAuthStore } from '../store/useAuthStore'
+import { useErrorStore } from '../store/useErrorStore'
+import { ErrorState } from './ErrorState'
+import { SummitAssistant } from './SherpaAssistant'
+import { isSsmRoute } from '../utils/routes'
+import { connectSystemEvents } from '../api/systemEventsApi'
 
 type AppShellProps = {
   mode: PaletteMode
@@ -11,8 +17,27 @@ type AppShellProps = {
 }
 
 export function AppShell({ mode, onToggleMode }: AppShellProps) {
-  const { isAuthenticated, accessNodes, activeModuleSlug } = useAuthStore()
+  const { isAuthenticated, accessNodes, activeModuleSlug, token } = useAuthStore()
+  const { errorType, clearError } = useErrorStore()
   const location = useLocation()
+
+  useEffect(() => {
+    clearError()
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [location.pathname, clearError])
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) return
+
+    const controller = new AbortController()
+    connectSystemEvents(controller.signal).catch((error) => {
+      if (!controller.signal.aborted) {
+        console.warn('No se pudo mantener el stream de eventos en tiempo real.', error)
+      }
+    })
+
+    return () => controller.abort()
+  }, [isAuthenticated, token])
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
@@ -23,7 +48,7 @@ export function AppShell({ mode, onToggleMode }: AppShellProps) {
     return <Navigate to="/select-module" replace />
   }
 
-  if (activeModuleSlug === 'security' && location.pathname.startsWith('/maintenance')) {
+  if (activeModuleSlug === 'security' && isSsmRoute(location.pathname)) {
     return <Navigate to="/security" replace />
   }
 
@@ -39,10 +64,15 @@ export function AppShell({ mode, onToggleMode }: AppShellProps) {
       <Navbar mode={mode} onToggleMode={onToggleMode} />
       <Box component="main" className="min-w-0 flex-1">
         <Container maxWidth="xl" className="px-4 py-5 sm:px-6 md:py-8">
-          <Outlet />
+          {errorType ? (
+            <ErrorState type={errorType} onRetry={clearError} />
+          ) : (
+            <Outlet />
+          )}
         </Container>
       </Box>
       <Footer />
+      <SummitAssistant />
     </Box>
   )
 }

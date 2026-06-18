@@ -15,13 +15,16 @@ import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { esESGrid, productCategoryLabels, productStatusLabels, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 
+const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((val) => (val === '' ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
+
 const productSchema = z.object({
   name: z.string().min(2, 'El nombre es requerido (mínimo 2 caracteres)'),
   providerUuid: z.string().min(1, 'Debes seleccionar un proveedor'),
   category: z.enum(['Insurance', 'SuretyBond', 'Assistance']),
   status: z.enum(['Active', 'Inactive', 'Draft']),
-  lineOfBusiness: z.string().optional(),
-  description: z.string().optional(),
+  lineOfBusiness: emptyToUndefined(z.string().optional()),
+  description: emptyToUndefined(z.string().optional()),
 })
 
 type ProductFormData = z.infer<typeof productSchema>
@@ -247,11 +250,11 @@ export function ProductsMaintenancePage() {
               </Stack>
 
               <Controller name="lineOfBusiness" control={control} render={({ field }) => (
-                <TextField {...field} label="Línea de Negocio" fullWidth helperText=" " />
+                <TextField {...field} label="Línea de Negocio" fullWidth error={!!errors.lineOfBusiness} helperText={errors.lineOfBusiness?.message?.toString() ?? ' '} />
               )} />
 
               <Controller name="description" control={control} render={({ field }) => (
-                <TextField {...field} label="Descripción" fullWidth multiline rows={3} helperText=" " />
+                <TextField {...field} label="Descripción" fullWidth multiline rows={3} error={!!errors.description} helperText={errors.description?.message?.toString() ?? ' '} />
               )} />
             </Stack>
           </DialogContent>

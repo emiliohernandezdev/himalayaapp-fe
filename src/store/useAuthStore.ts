@@ -38,9 +38,10 @@ type AuthState = {
   activeNodeSlug: string | null
   activeModuleSlug: string | null
   isAuthenticated: boolean
+  sessionExpired: boolean
   login: (token: string, user: UserInfo, accessNodes?: NodeAccess[], instanceUuid?: string) => void
   setActiveModule: (nodeSlug: string, moduleSlug: string) => void
-  logout: () => void
+  logout: (expired?: boolean) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -52,6 +53,7 @@ export const useAuthStore = create<AuthState>()(
       activeNodeSlug: null,
       activeModuleSlug: null,
       isAuthenticated: false,
+      sessionExpired: false,
       login: (token, user, accessNodes = [], instanceUuid) => {
         localStorage.setItem('token', token)
         const firstNode = accessNodes[0]
@@ -70,12 +72,13 @@ export const useAuthStore = create<AuthState>()(
           activeNodeSlug: selected ? selected.node.slug : firstModule ? firstNode.slug : null,
           activeModuleSlug: firstModule?.slug ?? null,
           isAuthenticated: true,
+          sessionExpired: false,
         })
       },
       setActiveModule: (nodeSlug, moduleSlug) => {
         set({ activeNodeSlug: nodeSlug, activeModuleSlug: moduleSlug })
       },
-      logout: () => {
+      logout: (expired = false) => {
         localStorage.removeItem('token')
         set({
           token: null,
@@ -84,6 +87,7 @@ export const useAuthStore = create<AuthState>()(
           activeNodeSlug: null,
           activeModuleSlug: null,
           isAuthenticated: false,
+          sessionExpired: expired,
         })
       },
     }),
