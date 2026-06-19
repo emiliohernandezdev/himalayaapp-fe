@@ -2,6 +2,7 @@ import { useAuthStore } from '../store/useAuthStore'
 import { publishAppEvent } from '../utils/appEvents'
 
 const apiEndpoint = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1'
+const sseEnabled = import.meta.env.VITE_ENABLE_SSE !== 'false'
 
 type BackendSystemEvent = {
   type: 'notification.created'
@@ -23,6 +24,8 @@ function dispatchBackendEvent(event: BackendSystemEvent) {
 }
 
 export function connectSystemEvents(signal: AbortSignal) {
+  if (!sseEnabled) return Promise.resolve()
+
   const token = useAuthStore.getState().token
   if (!token) return Promise.resolve()
 
