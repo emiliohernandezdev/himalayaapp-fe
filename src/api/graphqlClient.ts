@@ -5,7 +5,7 @@ import { graphqlOperationIds } from './graphqlOperationIds'
 import type { GraphqlOperationId } from './graphqlOperationIds'
 
 const graphqlEndpoint = import.meta.env.VITE_GRAPHQL_URL ?? 'http://localhost:3000/graphql'
-export const sessionExpiredMessage = 'Tu sesiÃ³n expirÃ³.'
+export const sessionExpiredMessage = 'Tu sesión expiró.'
 
 type GraphqlResponse<TData> = {
   data?: TData
@@ -61,7 +61,7 @@ export async function graphqlRequest<TData>(operationId: GraphqlOperationId, var
     }
 
     useErrorStore.getState().setError('500')
-    throw new Error('No se pudo conectar con el servidor. Por favor, verifica que el servicio estÃ© activo o intÃ©ntalo mÃ¡s tarde.')
+    throw new Error('No se pudo conectar con el servidor. Por favor, verifica que el servicio esté activo o inténtalo más tarde.')
   }
 
   if (payload.errors?.length) {
