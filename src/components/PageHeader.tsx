@@ -75,9 +75,6 @@ export function PageHeader({ title, description, actionLabel, icon: Icon }: Page
           </Box>
         ) : null}
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.4 }}>
-            En comando
-          </Typography>
           <Typography variant="h3" component="h2" sx={{ fontSize: { xs: '1.85rem', sm: '2.35rem' }, lineHeight: 1.05, fontWeight: 900, letterSpacing: 0 }}>
             {title}
           </Typography>

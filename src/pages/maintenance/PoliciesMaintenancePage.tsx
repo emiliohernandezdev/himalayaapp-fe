@@ -193,15 +193,27 @@ function PaymentMethodBadge({
 }
 
 export function PoliciesMaintenancePage() {
-  const { data: policies, error, loading, refetch } = useApiQuery('policies', fetchPolicies)
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
+  const { data: paginated, error, loading, refetch } = useApiQuery(
+    'policies-all',
+    () => fetchPolicies()
+  )
+  const policies = paginated?.items ?? []
+  const totalCount = paginated?.total ?? 0
+
   const canViewPolicies = usePermission('view_policies')
   const canManagePolicies = usePermission('manage_policies')
-  const { data: clients } = useApiQuery('clients-for-select', fetchClients)
-  const { data: providers } = useApiQuery('providers-for-select', fetchProviders)
-  const { data: products } = useApiQuery('products-for-select', fetchProducts)
-  const permissionsLoading = usePermissionLoading()
 
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
+  const { data: clientsData } = useApiQuery('clients-for-select', fetchClients)
+  const clients = clientsData?.items ?? []
+
+  const { data: providersData } = useApiQuery('providers-for-select', fetchProviders)
+  const providers = providersData?.items ?? []
+
+  const { data: productsData } = useApiQuery('products-for-select', fetchProducts)
+  const products = productsData?.items ?? []
+
+  const permissionsLoading = usePermissionLoading()
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>(() => createEmptyGridSelectionModel())
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [selected, setSelected] = useState<PolicyRaw | null>(null)
@@ -552,6 +564,8 @@ export function PoliciesMaintenancePage() {
 
       <ResponsiveDataGrid
         rows={filteredPolicies}
+        rowCount={totalCount}
+        paginationMode="client"
         columns={columns}
         getRowId={(row) => row.uuid}
         loading={loading}

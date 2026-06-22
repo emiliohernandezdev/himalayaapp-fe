@@ -28,20 +28,20 @@ const socialProfiles = [
 
 export function Footer() {
   return (
-    <Box component="footer" sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
+    <Box component="footer" sx={{ px: { xs: 1.5, sm: 3 }, pb: 3 }}>
       <Container maxWidth="xl" disableGutters>
         <Box
           sx={{
             position: 'relative',
             overflow: 'hidden',
-            borderRadius: 5,
+            borderRadius: { xs: 4, sm: 5 },
             border: '1px solid',
             borderColor: 'divider',
             background: (theme) => theme.palette.mode === 'dark'
               ? 'linear-gradient(135deg, rgba(7,17,31,0.96), rgba(16,40,61,0.82))'
               : 'linear-gradient(135deg, rgba(255,255,255,0.96), rgba(224,242,254,0.78))',
             boxShadow: 'var(--himalaya-shadow)',
-            p: { xs: 3, md: 4 },
+            p: { xs: 2, sm: 3, md: 4 },
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -56,47 +56,47 @@ export function Footer() {
               content: '""',
               position: 'absolute',
               inset: 'auto 0 0 0',
-              height: 160,
-              opacity: 0.16,
+              height: { xs: 60, sm: 160 },
+              opacity: 0.12,
               background:
                 'url("data:image/svg+xml,%3Csvg viewBox=%270 0 900 180%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cpath d=%27M0 180L160 60L270 120L420 30L570 142L720 54L900 180H0Z%27 fill=%27%23075985%27/%3E%3Cpath d=%27M420 30L382 70H462L420 30Z%27 fill=%27%23e0f2fe%27/%3E%3C/svg%3E") bottom center / cover no-repeat',
             },
           }}
         >
           <Box sx={{ position: 'relative', zIndex: 1 }}>
-            <Box className="grid gap-6 lg:grid-cols-[0.9fr_1.4fr]">
-              <Stack spacing={2.5}>
+            <Box className="grid gap-4 lg:grid-cols-[0.9fr_1.4fr]">
+              <Stack spacing={1.5}>
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                  <Box sx={{ display: 'grid', placeItems: 'center', width: 72, height: 58, borderRadius: 3, bgcolor: 'action.selected', color: 'primary.main', border: '1px solid', borderColor: 'divider' }}>
-                    <HimalayaLogo className="h-12 w-16" />
+                  <Box sx={{ display: 'grid', placeItems: 'center', width: { xs: 56, sm: 72 }, height: { xs: 46, sm: 58 }, borderRadius: { xs: 2, sm: 3 }, bgcolor: 'action.selected', color: 'primary.main', border: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+                    <HimalayaLogo className="h-8 w-12 sm:h-12 sm:w-16" />
                   </Box>
                   <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 950, lineHeight: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 950, lineHeight: 1, fontSize: { xs: '1.15rem', sm: '1.25rem', md: '1.5rem' } }}>
                       Seguros Himalaya
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase', fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
                       Aplicativo de manejo de seguros
                     </Typography>
                   </Box>
                 </Stack>
-                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 440, lineHeight: 1.8 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' }, maxWidth: 440, lineHeight: 1.8 }}>
                   Gestion de seguros, fianzas, proveedores, polizas y seguimiento operativo.
                 </Typography>
               </Stack>
 
-              <Box className="grid gap-3 md:grid-cols-3">
+              <Box className="grid gap-2 sm:gap-3 md:grid-cols-3">
                 {companyContact.map((item) => {
                   const Icon = item.icon
                   return (
-                    <Box key={item.title} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', p: 2.25 }}>
-                      <Stack spacing={1.25}>
-                        <Box sx={{ display: 'grid', placeItems: 'center', width: 42, height: 42, borderRadius: 2, bgcolor: 'action.selected', color: 'primary.main' }}>
-                          <Icon size={19} />
+                    <Box key={item.title} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', p: { xs: 1.5, sm: 2 } }}>
+                      <Stack direction={{ xs: 'row', sm: 'column' }} spacing={1.5} sx={{ alignItems: { xs: 'center', sm: 'flex-start' } }}>
+                        <Box sx={{ display: 'grid', placeItems: 'center', width: { xs: 36, sm: 42 }, height: { xs: 36, sm: 42 }, borderRadius: 2, bgcolor: 'action.selected', color: 'primary.main', flexShrink: 0 }}>
+                          <Icon size={17} />
                         </Box>
                         <Box>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{item.title}</Typography>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 900, fontSize: { xs: '0.85rem', sm: '0.95rem' } }}>{item.title}</Typography>
                           {item.lines.map((line) => (
-                            <Typography key={line} variant="body2" color="text.secondary">
+                            <Typography key={line} variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: { xs: '0.75rem', sm: '0.8rem' }, lineHeight: 1.3 }}>
                               {line}
                             </Typography>
                           ))}
@@ -108,8 +108,8 @@ export function Footer() {
               </Box>
             </Box>
 
-            <Stack direction={{ xs: 'column', md: 'row' }} sx={{ mt: 4, alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, justifyContent: 'space-between' }}>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} sx={{ mt: { xs: 2.5, sm: 4 }, alignItems: { xs: 'stretch', md: 'center' }, gap: 2, justifyContent: 'space-between' }}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1, justifyContent: { xs: 'center', md: 'flex-start' } }}>
                 {socialProfiles.map((item) => {
                   const Icon = item.icon
                   return (
@@ -127,7 +127,7 @@ export function Footer() {
                         color: 'text.primary',
                         textDecoration: 'none',
                         px: 1.5,
-                        py: 0.85,
+                        py: { xs: 0.65, sm: 0.85 },
                         transition: 'all 0.18s ease',
                         '&:hover': {
                           borderColor: 'primary.main',
@@ -137,15 +137,15 @@ export function Footer() {
                       }}
                     >
                       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                        <Icon size={15} color="var(--himalaya-primary)" />
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{item.value}</Typography>
+                        <Icon size={14} color="var(--himalaya-primary)" />
+                        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: { xs: '0.75rem', sm: '0.85rem' } }}>{item.value}</Typography>
                       </Stack>
                     </Box>
                   )
                 })}
               </Stack>
 
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, textAlign: { xs: 'center', md: 'right' }, fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
                 Himalaya Seguros y Fianzas
               </Typography>
             </Stack>

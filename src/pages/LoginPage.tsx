@@ -33,8 +33,8 @@ type LoginPageProps = {
 }
 
 const loginSchema = z.object({
-  email: z.string().email('Ingresa un correo electronico valido').min(1, 'El correo es requerido'),
-  password: z.string().min(6, 'La contrasena debe tener al menos 6 caracteres'),
+  email: z.string().email('Ingresa un correo electrónico válido').min(1, 'El correo es requerido'),
+  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   instanceUuid: z.string().optional(),
 })
 
@@ -80,50 +80,140 @@ export function LoginPage({ mode }: LoginPageProps) {
         ?? response.accessNodes[0]?.modules[0]
 
       loginStore(response.accessToken, response.user, response.accessNodes, selectedModule?.instanceUuid)
-      toast.success(`Bienvenido de nuevo, ${response.user.firstName}!`)
+      toast.success(`¡Bienvenido de nuevo, ${response.user.firstName}!`)
       navigate(selectedModule?.route ?? '/dashboard')
     } catch (err: any) {
-      toast.error(err.message || 'No se pudo iniciar sesion.')
+      toast.error(err.message || 'No se pudo iniciar sesión.')
     }
+  }
+
+  const textFieldSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 3,
+      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+      bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+      '& fieldset': {
+        borderColor: 'divider',
+        transition: 'border-color 0.2s',
+      },
+      '&:hover fieldset': {
+        borderColor: 'primary.main',
+      },
+      '&.Mui-focused': {
+        bgcolor: 'background.paper',
+        '& fieldset': {
+          borderWidth: '2px',
+          borderColor: 'primary.main',
+        },
+        boxShadow: (theme: any) => theme.palette.mode === 'dark'
+          ? '0 0 0 4px rgba(2, 132, 199, 0.25)'
+          : '0 0 0 4px rgba(2, 132, 199, 0.12)',
+      },
+    },
+    '& .MuiInputLabel-root': {
+      fontWeight: 550,
+      '&.Mui-focused': {
+        fontWeight: 700,
+      }
+    },
   }
 
   return (
     <Box
       data-theme={mode}
-      className="min-h-screen bg-[var(--himalaya-bg)] px-4 py-6 text-[var(--himalaya-text)] sm:px-6 lg:px-8"
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        px: { xs: 2, sm: 3, lg: 4 },
+        py: { xs: 3, sm: 4 },
+        color: 'text.primary',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
-      <Box className="mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-[var(--himalaya-border)] bg-[var(--himalaya-surface)] shadow-[var(--himalaya-shadow)] lg:grid lg:grid-cols-[0.95fr_1.05fr]">
-        <Box className="relative flex flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0b1329] via-[#102244] to-[#080d1a] p-8 sm:p-10 lg:p-12 text-white">
-          {/* Decorative ambient light glows */}
-          <Box className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
-          <Box className="absolute right-[-10%] top-[20%] h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+      <Box 
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: '0.95fr 1.05fr' },
+          width: '100%',
+          maxWidth: { xs: '480px', lg: '1200px' },
+          minHeight: { xs: 'auto', lg: 'calc(100vh - 48px)' },
+          overflow: 'hidden',
+          borderRadius: 4,
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          boxShadow: 'var(--himalaya-shadow)',
+        }}
+      >
+        {/* Left Column: Premium Mountain Branding */}
+        <Box 
+          sx={{
+            position: 'relative',
+            display: { xs: 'none', lg: 'flex' },
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            overflow: 'hidden',
+            background: 'linear-gradient(135deg, #090d16 0%, #0c182e 50%, #080d19 100%)',
+            p: { xs: 4, sm: 5, lg: 6 },
+            color: 'white',
+          }}
+        >
+          {/* Ambient Glows */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '-10%',
+              left: '-10%',
+              width: '80%',
+              height: '80%',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(2, 132, 199, 0.15) 0%, rgba(2, 132, 199, 0) 70%)',
+              filter: 'blur(40px)',
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: '10%',
+              right: '-10%',
+              width: '80%',
+              height: '80%',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(124, 58, 237, 0.12) 0%, rgba(124, 58, 237, 0) 70%)',
+              filter: 'blur(40px)',
+              pointerEvents: 'none',
+            }}
+          />
 
           {/* Logo and Header */}
-          <Stack spacing={5} className="relative z-10">
+          <Stack spacing={5} sx={{ position: 'relative', zIndex: 10 }}>
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
               <HimalayaLogo className="h-12 w-16 shrink-0 text-sky-100" />
               <Box>
-                <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' }, fontWeight: 800, letterSpacing: '0.05em', color: '#f0f9ff' }}>
+                <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' }, fontWeight: 900, letterSpacing: '0.04em', color: '#f0f9ff' }}>
                   Himalaya
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'sky.200', opacity: 0.8, fontWeight: 500 }}>
+                <Typography variant="body2" sx={{ color: '#bae6fd', opacity: 0.85, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.72rem' }}>
                   Seguros y fianzas
                 </Typography>
               </Box>
             </Stack>
 
-            <Box className="max-w-xl">
-              <Typography variant="h2" component="h1" sx={{ fontSize: { xs: '1.75rem', sm: '2.5rem', md: '2.75rem' }, fontWeight: 900, lineHeight: 1.15, background: 'linear-gradient(to right, #ffffff, #e0f2fe, #bae6fd)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <Box sx={{ maxWidth: 500 }}>
+              <Typography variant="h2" component="h1" sx={{ fontSize: { xs: '1.85rem', sm: '2.5rem', md: '2.75rem' }, fontWeight: 900, lineHeight: 1.15, background: 'linear-gradient(to right, #ffffff, #e0f2fe, #bae6fd)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.02em' }}>
                 Protección que trasciende
               </Typography>
-              <Typography className="mt-4" sx={{ color: 'sky.100', opacity: 0.8, fontSize: '0.95rem', lineHeight: 1.6 }}>
+              <Typography sx={{ mt: 2.5, color: '#e0f2fe', opacity: 0.8, fontSize: '0.95rem', lineHeight: 1.6, fontWeight: 550 }}>
                 Gestión unificada de pólizas, reclamos y relaciones comerciales con la robustez y solidez que nos define.
               </Typography>
             </Box>
           </Stack>
 
           {/* Majestic Mountain SVG (Occupying the empty space elegantly) */}
-          <Box className="relative z-10 w-full my-auto flex justify-center items-center py-6">
+          <Box sx={{ position: 'relative', zIndex: 10, width: '100%', my: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
             <svg viewBox="0 0 800 450" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto max-h-[280px] drop-shadow-[0_12px_24px_rgba(0,0,0,0.5)]">
               {/* Stars/Snow in the background */}
               <circle cx="150" cy="80" r="1.5" fill="white" opacity="0.6" />
@@ -185,23 +275,55 @@ export function LoginPage({ mode }: LoginPageProps) {
           </Box>
         </Box>
 
-        <Box className="flex items-center justify-center p-6 sm:p-8 lg:p-10">
-          <Box className="w-full max-w-md">
+        {/* Right Column: Premium Form */}
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            p: { xs: 4, sm: 5, lg: 6 },
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Box sx={{ width: '100%', maxWidth: '400px' }}>
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
-              <Stack spacing={3}>
-                <Stack spacing={1}>
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <Box className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--himalaya-primary-soft)]">
-                      <ShieldCheck size={20} color="var(--himalaya-primary)" />
+              <Stack spacing={4}>
+                <Stack spacing={1.5}>
+                  {/* Logo only on mobile/tablet */}
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', display: { xs: 'flex', lg: 'none' }, mb: 2 }}>
+                    <HimalayaLogo className="h-10 w-14 shrink-0 text-primary-main" />
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 900, letterSpacing: '0.04em', lineHeight: 1.1 }}>
+                        Himalaya
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', opacity: 0.85, fontWeight: 750, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.65rem' }}>
+                        Seguros y fianzas
+                      </Typography>
                     </Box>
-                    <Typography variant="overline" color="text.secondary">
+                  </Stack>
+
+                  <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                    <Box 
+                      sx={{ 
+                        display: 'grid', 
+                        placeItems: 'center', 
+                        width: 36,
+                        height: 36,
+                        borderRadius: 2, 
+                        bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.2)' : 'rgba(2, 132, 199, 0.08)',
+                        color: 'primary.main',
+                      }}
+                    >
+                      <ShieldCheck size={20} />
+                    </Box>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 800, letterSpacing: 1.2 }}>
                       Acceso Seguro
                     </Typography>
                   </Stack>
-                  <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 750 }}>
-                    Iniciar sesion
+                  <Typography variant="h4" sx={{ fontSize: { xs: '1.65rem', sm: '2.1rem' }, fontWeight: 900, letterSpacing: '-0.02em' }}>
+                    Iniciar sesión
                   </Typography>
-                  <Typography color="text.secondary">
+                  <Typography color="text.secondary" sx={{ fontSize: '0.9rem', fontWeight: 500 }}>
                     Ingresa tus credenciales del sistema para continuar.
                   </Typography>
                 </Stack>
@@ -211,8 +333,9 @@ export function LoginPage({ mode }: LoginPageProps) {
                     severity="warning"
                     variant="outlined"
                     sx={{
-                      borderRadius: 2.5,
+                      borderRadius: 3,
                       borderColor: 'warning.main',
+                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(217, 119, 6, 0.15)' : 'rgba(217, 119, 6, 0.06)',
                       fontWeight: 600,
                       fontSize: '0.85rem',
                       alignItems: 'center',
@@ -222,19 +345,20 @@ export function LoginPage({ mode }: LoginPageProps) {
                   </Alert>
                 )}
 
-                <Stack spacing={2.5}>
+                <Stack spacing={3}>
                   <Controller
                     name="email"
                     control={control}
                     render={({ field }) => (
                       <TextField
                         {...field}
-                        label="Correo electronico *"
+                        label="Correo electrónico *"
                         type="email"
                         fullWidth
                         autoComplete="email"
                         error={!!errors.email}
                         helperText={errors.email?.message ?? ' '}
+                        sx={textFieldSx}
                       />
                     )}
                   />
@@ -250,12 +374,13 @@ export function LoginPage({ mode }: LoginPageProps) {
                         autoComplete="current-password"
                         error={!!errors.password}
                         helperText={errors.password?.message ?? ' '}
+                        sx={textFieldSx}
                         slotProps={{
                           input: {
                             endAdornment: (
                               <InputAdornment position="end">
                                 <IconButton
-                                  aria-label="mostrar u ocultar contrasena"
+                                  aria-label="mostrar u ocultar contraseña"
                                   onClick={() => setShowPassword(!showPassword)}
                                   edge="end"
                                 >
@@ -273,9 +398,9 @@ export function LoginPage({ mode }: LoginPageProps) {
                       name="instanceUuid"
                       control={control}
                       render={({ field }) => (
-                        <FormControl fullWidth>
-                          <InputLabel id="module-instance-label">Modulo *</InputLabel>
-                          <Select {...field} labelId="module-instance-label" label="Modulo *">
+                        <FormControl fullWidth sx={textFieldSx}>
+                          <InputLabel id="module-instance-label">Módulo *</InputLabel>
+                          <Select {...field} labelId="module-instance-label" label="Módulo *">
                             {instanceOptions.map((module) => (
                               <MenuItem key={module.instanceUuid} value={module.instanceUuid}>
                                 {module.label}
@@ -286,10 +411,42 @@ export function LoginPage({ mode }: LoginPageProps) {
                       )}
                     />
                   ) : null}
-                  <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1, justifyContent: 'space-between' }}>
-                    <FormControlLabel control={<Checkbox />} label="Recordar acceso" />
-                    <Button variant="text">Recuperar clave</Button>
+                  
+                  <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1, justifyContent: 'space-between', mt: -1 }}>
+                    <FormControlLabel 
+                      control={
+                        <Checkbox 
+                          sx={{ 
+                            color: 'primary.main',
+                            '&.Mui-checked': {
+                              color: 'primary.main',
+                            }
+                          }} 
+                        />
+                      } 
+                      label={
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                          Recordar acceso
+                        </Typography>
+                      } 
+                    />
+                    <Button 
+                      variant="text" 
+                      sx={{ 
+                        textTransform: 'none', 
+                        fontWeight: 700, 
+                        color: 'primary.main',
+                        borderRadius: 2,
+                        fontSize: '0.85rem',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                        }
+                      }}
+                    >
+                      Recuperar clave
+                    </Button>
                   </Stack>
+
                   <Button
                     type="submit"
                     variant="contained"
@@ -297,6 +454,27 @@ export function LoginPage({ mode }: LoginPageProps) {
                     disabled={isSubmitting || (instanceOptions.length > 1 && !selectedInstanceUuid)}
                     endIcon={isSubmitting ? undefined : <ArrowRight size={18} />}
                     startIcon={isSubmitting ? <CircularProgress size={18} color="inherit" /> : <LockKeyhole size={18} />}
+                    sx={{
+                      py: 1.6,
+                      mt: 1,
+                      borderRadius: 3,
+                      fontWeight: 800,
+                      fontSize: '0.95rem',
+                      textTransform: 'none',
+                      boxShadow: (theme) => theme.palette.mode === 'dark'
+                        ? '0 8px 24px rgba(2, 132, 199, 0.3)'
+                        : '0 8px 20px rgba(2, 132, 199, 0.18)',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                        boxShadow: (theme) => theme.palette.mode === 'dark'
+                          ? '0 12px 30px rgba(2, 132, 199, 0.45)'
+                          : '0 12px 26px rgba(2, 132, 199, 0.28)',
+                      },
+                      '&:active': {
+                        transform: 'translateY(1px)',
+                      }
+                    }}
                   >
                     {isSubmitting ? 'Iniciando sesión...' : instanceOptions.length > 1 ? 'Entrar al módulo' : 'Entrar al sistema'}
                   </Button>

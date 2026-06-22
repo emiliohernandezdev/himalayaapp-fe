@@ -1022,11 +1022,11 @@ function CustomRadarChart({
   const theme = useTheme()
   const isDark = theme.palette.mode === 'dark'
 
-  const width = 280
-  const height = 150
+  const width = 450
+  const height = 300
   const cx = width / 2
   const cy = height / 2 - 10
-  const r = 42
+  const r = 95
 
   const count = data.length
   if (count < 3) {
@@ -1045,94 +1045,111 @@ function CustomRadarChart({
     const radius = (val / maxVal) * r
     const x = cx + radius * Math.cos(angle)
     const y = cy + radius * Math.sin(angle)
-    return { x, y, label: String(d.label ?? ''), angle }
+    return { x, y, label: String(d.label ?? ''), value: val, angle }
   })
 
   const polygonPointsStr = points.map((p) => `${p.x},${p.y}`).join(' ')
   const gridLevels = [0.25, 0.5, 0.75, 1]
 
-  const gridColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'
-  const axisColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'
+  const axisColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)'
   const textColor = theme.palette.text.secondary
-  const areaColor = isDark ? 'rgba(56, 189, 248, 0.25)' : 'rgba(2, 132, 199, 0.2)'
+  const areaColor = isDark ? 'rgba(56, 189, 248, 0.22)' : 'rgba(2, 132, 199, 0.15)'
   const strokeColor = isDark ? '#38bdf8' : '#0284c7'
   const dotColor = isDark ? '#60a5fa' : '#0369a1'
 
   return (
     <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 1 }}>
-      <svg width={width} height={height}>
-        {gridLevels.map((level, idx) => {
-          const gridPoints = data.map((_, i) => {
+      <Box sx={{ width: '100%', maxWidth: 450, position: 'relative' }}>
+        <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="100%" style={{ maxHeight: 280, overflow: 'visible' }}>
+          {gridLevels.map((level, idx) => {
+            const gridPoints = data.map((_, i) => {
+              const angle = (i * 2 * Math.PI) / count - Math.PI / 2
+              const radius = level * r
+              const x = cx + radius * Math.cos(angle)
+              const y = cy + radius * Math.sin(angle)
+              return `${x},${y}`
+            }).join(' ')
+            return (
+              <polygon
+                key={idx}
+                points={gridPoints}
+                fill="none"
+                stroke={gridColor}
+                strokeWidth="1"
+              />
+            )
+          })}
+
+          {data.map((_, i) => {
             const angle = (i * 2 * Math.PI) / count - Math.PI / 2
-            const radius = level * r
-            const x = cx + radius * Math.cos(angle)
-            const y = cy + radius * Math.sin(angle)
-            return `${x},${y}`
-          }).join(' ')
-          return (
-            <polygon
-              key={idx}
-              points={gridPoints}
-              fill="none"
-              stroke={gridColor}
-              strokeWidth="1"
-            />
-          )
-        })}
+            const x2 = cx + r * Math.cos(angle)
+            const y2 = cy + r * Math.sin(angle)
+            return (
+              <line
+                key={i}
+                x1={cx}
+                y1={cy}
+                x2={x2}
+                y2={y2}
+                stroke={axisColor}
+                strokeWidth="1"
+              />
+            )
+          })}
 
-        {data.map((_, i) => {
-          const angle = (i * 2 * Math.PI) / count - Math.PI / 2
-          const x2 = cx + r * Math.cos(angle)
-          const y2 = cy + r * Math.sin(angle)
-          return (
-            <line
-              key={i}
-              x1={cx}
-              y1={cy}
-              x2={x2}
-              y2={y2}
-              stroke={axisColor}
-              strokeWidth="1"
-            />
-          )
-        })}
+          {points.map((p, i) => {
+            const cosVal = Math.cos(p.angle)
+            const sinVal = Math.sin(p.angle)
+            
+            const labelX = cx + (r + 16) * cosVal
+            const labelY = cy + (r + 14) * sinVal + 4
 
-        {points.map((p, i) => {
-          const labelX = cx + (r + 14) * Math.cos(p.angle)
-          const labelY = cy + (r + 10) * Math.sin(p.angle) + 4
-          return (
-            <text
-              key={i}
-              x={labelX}
-              y={labelY}
-              textAnchor="middle"
-              fill={textColor}
-              style={{ fontSize: '8px', fontWeight: 600, fontFamily: 'inherit' }}
-            >
-              {String(p.label ?? '').substring(0, 10)}
-            </text>
-          )
-        })}
+            let textAnchor: "end" | "middle" | "inherit" | "start" = "middle"
+            if (cosVal > 0.15) {
+              textAnchor = "start"
+            } else if (cosVal < -0.15) {
+              textAnchor = "end"
+            }
 
-        <polygon
-          points={polygonPointsStr}
-          fill={areaColor}
-          stroke={strokeColor}
-          strokeWidth="2"
-        />
+            return (
+              <text
+                key={i}
+                x={labelX}
+                y={labelY}
+                textAnchor={textAnchor}
+                fill={textColor}
+                style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'inherit' }}
+              >
+                {String(p.label ?? '').substring(0, 18)}
+              </text>
+            )
+          })}
 
-        {points.map((p, i) => (
-          <circle
-            key={i}
-            cx={p.x}
-            cy={p.y}
-            r="3"
-            fill={dotColor}
+          <polygon
+            points={polygonPointsStr}
+            fill={areaColor}
+            stroke={strokeColor}
+            strokeWidth="2"
           />
-        ))}
-      </svg>
+
+          {points.map((p, i) => (
+            <Tooltip key={i} title={`${p.label}: ${p.value}`} arrow placement="top">
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r="5"
+                fill={dotColor}
+                stroke={strokeColor}
+                strokeWidth="1.5"
+                style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
+              />
+            </Tooltip>
+          ))}
+        </svg>
+      </Box>
       {(xAxisLabel || yAxisLabel) && (
-        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '9px', fontWeight: 600, mt: 0.5 }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px', fontWeight: 600, mt: 1.5 }}>
           {[xAxisLabel, yAxisLabel].filter(Boolean).join(' / ')}
         </Typography>
       )}
@@ -1812,7 +1829,8 @@ export function DashboardPage() {
   // Compute widgetCatalog from dbWidgets dynamically
   const widgetCatalog = useMemo(() => {
     if (!dbWidgets) return []
-    return dbWidgets
+    const widgets = dbWidgets.items ?? []
+    return widgets
       .filter((w) => w.enabled)
       .map((w) => {
         let defaultLayoutObj: WidgetLayout = { x: 0, y: 0, w: 3, h: 2, minW: 2, minH: 2 }
@@ -2111,13 +2129,13 @@ export function DashboardPage() {
 
     gridRef.current?.destroy(false)
 
-    // margin set to 18px and float set to false to prevent widget collisions and tight spacing
+    const isMobile = window.innerWidth < 640
     const grid = GridStack.init(
       {
         animate: customizeMode,
         column: 12,
         float: false,
-        margin: 18,
+        margin: isMobile ? 8 : 18,
         cellHeight: 84,
         minRow: 1,
         disableDrag: !customizeMode,
@@ -3352,14 +3370,17 @@ export function DashboardPage() {
                           })
                         }}
                       >
-                        {AGGREGATE_FUNCTIONS.map((fn) => (
-                          <MenuItem key={fn.value} value={fn.value}>
-                            <Stack spacing={0.25}>
-                              <Typography variant="body2">{fn.label}</Typography>
-                              <Typography variant="caption" color="text.secondary">{fn.description}</Typography>
-                            </Stack>
-                          </MenuItem>
-                        ))}
+                        {(() => {
+                          const allowedKeys = DATASOURCE_FUNCTIONS[tempSettings.dataSource ?? 'clientes'] ?? []
+                          return AGGREGATE_FUNCTIONS.filter((fn) => allowedKeys.includes(fn.value)).map((fn) => (
+                            <MenuItem key={fn.value} value={fn.value}>
+                              <Stack spacing={0.25}>
+                                <Typography variant="body2">{fn.label}</Typography>
+                                <Typography variant="caption" color="text.secondary">{fn.description}</Typography>
+                              </Stack>
+                            </MenuItem>
+                          ))
+                        })()}
                       </Select>
                     </FormControl>
  
@@ -4016,6 +4037,22 @@ const AGGREGATE_FUNCTIONS = [
   { value: 'conversion_rate', label: 'Tasa de conversion', description: 'Activos sobre total filtrado' },
 ]
 
+const DATASOURCE_FUNCTIONS: Record<string, string[]> = {
+  clientes: [
+    'count', 'sum', 'avg', 'min', 'max', 'distinct_count',
+    'active_count', 'inactive_count', 'active_rate', 'conversion_rate'
+  ],
+  polizas: [
+    'count', 'sum', 'avg', 'min', 'max', 'distinct_count',
+    'active_count', 'expired_count', 'cancelled_count', 'due_soon_count', 'renewal_due_count',
+    'active_rate', 'expiration_rate'
+  ],
+  casos: [
+    'count', 'sum', 'avg', 'min', 'max', 'distinct_count',
+    'active_count', 'open_count', 'closed_count', 'cancelled_count', 'overdue_count', 'due_soon_count',
+    'active_rate'
+  ]
+}
 
 const AGGREGATE_FIELD_REQUIRED = new Set(['sum', 'avg', 'min', 'max'])
 const AGGREGATE_FIELD_OPTIONAL = new Set(['distinct_count'])

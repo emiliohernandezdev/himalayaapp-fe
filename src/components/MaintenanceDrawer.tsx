@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Dialog, IconButton, InputAdornment, Skeleton, Stack, TextField, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Button, Dialog, IconButton, InputAdornment, Skeleton, Stack, TextField, Tooltip, Typography, useMediaQuery } from '@mui/material'
 import { Clock3, Grid3X3, Search, Star, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -96,6 +96,7 @@ const securityModules: MaintenanceModuleDto[] = [
 ]
 
 export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProps) {
+  const isMobile = useMediaQuery('(max-width:600px)')
   const [query, setQuery] = useState('')
   const [view, setView] = useState<ModuleView>('all')
   const activeModuleSlug = useAuthStore((state) => state.activeModuleSlug)
@@ -256,7 +257,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
                 <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.4 }}>
                   Centro de mantenimientos
                 </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 950, lineHeight: 1.05 }} className="truncate">
+                <Typography variant="h4" sx={{ fontWeight: 950, lineHeight: 1.1, fontSize: { xs: '1.4rem', sm: '1.85rem', md: '2.125rem' } }}>
                   Seguros Himalaya
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }} className="hidden sm:block">
@@ -328,7 +329,7 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
                   ))}
                 </Box>
               ) : (
-                <Box className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <Box className="grid grid-cols-1 gap-2 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {filteredModules.map((module) => {
                     const Icon = getMaintenanceModuleIcon(module.icon)
                     const tone = toneStyles[module.tone as keyof typeof toneStyles] ?? toneStyles.sky
@@ -336,25 +337,25 @@ export function MaintenanceDrawer({ open, onClose, mode }: MaintenanceDrawerProp
                     const isFavorite = favoriteRoutes.includes(route)
 
                     return (
-                      <Box key={module.title} className="relative overflow-hidden rounded-3xl border border-[var(--himalaya-border)] bg-[var(--himalaya-surface)] shadow-sm transition hover:-translate-y-1 hover:border-[var(--himalaya-primary)] hover:shadow-[var(--himalaya-shadow)]">
-                        <Box className="absolute inset-y-0 left-0 w-1.5" sx={{ backgroundColor: tone.accent }} />
-                        <Box className="pointer-events-none absolute bottom-3 right-3 h-28 w-28 rounded-3xl" sx={{ backgroundColor: tone.soft, transform: 'rotate(-8deg)' }} />
-                        <Icon size={88} strokeWidth={1.2} className="pointer-events-none absolute bottom-7 right-7 opacity-20" color={tone.accent} />
+                      <Box key={module.title} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-[var(--himalaya-border)] bg-[var(--himalaya-surface)] shadow-sm transition hover:-translate-y-1 hover:border-[var(--himalaya-primary)] hover:shadow-[var(--himalaya-shadow)]">
+                        <Box className="absolute inset-y-0 left-0 w-1" sx={{ backgroundColor: tone.accent }} />
+                        <Box className="pointer-events-none absolute bottom-2 right-2 h-16 w-16 sm:h-28 sm:w-28 rounded-2xl sm:rounded-3xl" sx={{ backgroundColor: tone.soft, transform: 'rotate(-8deg)' }} />
+                        <Icon size={isMobile ? 48 : 88} strokeWidth={1.2} className="pointer-events-none absolute bottom-4 right-4 sm:bottom-7 sm:right-7 opacity-20" color={tone.accent} />
                         <Tooltip title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}>
                           <IconButton
                             aria-label={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                             onClick={() => toggleFavorite(route)}
                             size="small"
-                            sx={{ position: 'absolute', right: 14, top: 14, zIndex: 10, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', boxShadow: '0 8px 20px rgba(15, 23, 42, 0.12)' }}
+                            sx={{ position: 'absolute', right: 12, top: 12, zIndex: 10, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', p: { xs: 0.5, sm: 0.75 }, boxShadow: '0 8px 20px rgba(15, 23, 42, 0.12)' }}
                           >
-                            <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} color={isFavorite ? 'var(--himalaya-primary)' : 'currentColor'} />
+                            <Star size={isMobile ? 15 : 18} fill={isFavorite ? 'currentColor' : 'none'} color={isFavorite ? 'var(--himalaya-primary)' : 'currentColor'} />
                           </IconButton>
                         </Tooltip>
-                        <Box component={Link} to={route} onClick={() => rememberRecent(route)} className="relative z-0 block min-h-40 p-6 pr-16 no-underline text-inherit sm:min-h-44">
-                          <Typography variant="subtitle1" sx={{ fontWeight: 900, fontSize: '1.08rem' }} className="pr-2">
+                        <Box component={Link} to={route} onClick={() => rememberRecent(route)} className="relative z-0 block pr-14 sm:pr-16 no-underline text-inherit" sx={{ minHeight: { xs: 80, sm: 160 }, p: { xs: 2, sm: 3 } }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 900, fontSize: { xs: '0.925rem', sm: '1.08rem' } }} className="pr-1">
                             {module.title}
                           </Typography>
-                          <Typography variant="body2" className="mt-2 max-w-[28rem] opacity-80">
+                          <Typography variant="body2" className="mt-1 max-w-[28rem] opacity-80" sx={{ fontSize: { xs: '0.785rem', sm: '0.875rem' }, lineHeight: 1.4 }}>
                             {module.description}
                           </Typography>
                         </Box>

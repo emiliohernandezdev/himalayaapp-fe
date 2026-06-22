@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Pagination, Stack, TextField, Typography } from '@mui/material'
-import { Building2, Edit2, Mail, MoreVertical, PackageCheck, Phone, Trash2, User, MapPin, ExternalLink, X } from 'lucide-react'
+import { Building2, Edit2, Mail, MoreVertical, PackageCheck, Phone, Trash2, User, MapPin, ExternalLink, X, ShieldCheck, Layers, HeartHandshake, Package } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -45,17 +45,22 @@ function providerAvatarColor(name: string) {
 }
 
 export function ProvidersMaintenancePage() {
-  const { data: records, error, loading, refetch } = useApiQuery('providers', fetchProviders)
-  const { data: products } = useApiQuery('products-for-provider-detail', fetchProducts)
+  const [page, setPage] = useState(1)
+  const pageSize = 12
+  const { data: paginated, error, loading, refetch } = useApiQuery(
+    `providers-${page}-${pageSize}`,
+    () => fetchProviders(page, pageSize)
+  )
+  const { data: productsData } = useApiQuery('products-for-provider-detail', fetchProducts)
+  const products = productsData?.items ?? []
   const canViewProviders = usePermission('view_providers')
   const canManageProviders = usePermission('manage_providers')
   const permissionsLoading = usePermissionLoading()
 
-  const [page, setPage] = useState(1)
-  const pageSize = 12
-  const providers: ProviderRaw[] = records ?? []
-  const totalPages = Math.ceil(providers.length / pageSize)
-  const paginatedProviders = providers.slice((page - 1) * pageSize, page * pageSize)
+  const providers: ProviderRaw[] = paginated?.items ?? []
+  const totalCount = paginated?.total ?? 0
+  const totalPages = Math.ceil(totalCount / pageSize)
+  const paginatedProviders = providers
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [selected, setSelected] = useState<ProviderRaw | null>(null)
@@ -585,67 +590,144 @@ export function ProvidersMaintenancePage() {
                     </Typography>
                   </Box>
                 ) : (
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, maxHeight: 420, overflowY: 'auto', pr: 0.5 }}>
-                    {selectedProducts.map((product) => (
-                      <Box
-                        key={product.uuid}
-                        sx={{
-                          p: 2.5,
-                          borderRadius: 3,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          bgcolor: 'background.paper',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                          transition: 'border-color 0.2s',
-                          '&:hover': { borderColor: 'primary.main' }
-                        }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary', mb: 0.5, lineHeight: 1.2 }}>
-                          {product.name}
-                        </Typography>
+                  <Box sx={{ maxHeight: { xs: 260, md: 380 }, overflowY: 'auto', pr: 1 }}>
+                    <Stack spacing={1.5}>
+                      {selectedProducts.map((product) => {
+                        const c = product.category?.toLowerCase() || ''
+                        let style = {
+                          icon: <Package size={20} />,
+                          gradient: 'linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(100, 116, 139, 0.04) 100%)',
+                          color: '#64748b',
+                          softBg: 'rgba(100, 116, 139, 0.08)',
+                        }
                         
-                        <Stack spacing={1} sx={{ mt: 1.5 }}>
-                          <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                            <Chip
-                              size="small"
-                              label={t(productCategoryLabels, product.category)}
+                        if (c.includes('insur') || c.includes('segur')) {
+                          style = {
+                            icon: <ShieldCheck size={20} />,
+                            gradient: 'linear-gradient(135deg, rgba(2, 132, 199, 0.15) 0%, rgba(2, 132, 199, 0.05) 100%)',
+                            color: '#0284c7',
+                            softBg: 'rgba(2, 132, 199, 0.08)',
+                          }
+                        } else if (c.includes('reinsur') || c.includes('resegur')) {
+                          style = {
+                            icon: <Layers size={20} />,
+                            gradient: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(124, 58, 237, 0.05) 100%)',
+                            color: '#7c3aed',
+                            softBg: 'rgba(124, 58, 237, 0.08)',
+                          }
+                        } else if (c.includes('assist') || c.includes('asist')) {
+                          style = {
+                            icon: <HeartHandshake size={20} />,
+                            gradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(236, 72, 153, 0.05) 100%)',
+                            color: '#db2777',
+                            softBg: 'rgba(236, 72, 153, 0.08)',
+                          }
+                        }
+
+                        return (
+                          <Box
+                            key={product.uuid}
+                            sx={{
+                              display: 'flex',
+                              flexDirection: { xs: 'column', sm: 'row' },
+                              alignItems: { xs: 'stretch', sm: 'center' },
+                              justifyContent: 'space-between',
+                              p: 2,
+                              gap: 2,
+                              borderRadius: 3,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              bgcolor: 'background.paper',
+                              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                              '&:hover': {
+                                borderColor: 'primary.main',
+                                transform: 'translateY(-2px)',
+                                boxShadow: (theme) => theme.palette.mode === 'dark'
+                                  ? '0 8px 24px rgba(0, 0, 0, 0.3)'
+                                  : '0 8px 20px rgba(0, 0, 0, 0.04)',
+                              }
+                            }}
+                          >
+                            {/* Left: Icon and Name */}
+                            <Stack direction="row" spacing={2} sx={{ alignItems: 'center', minWidth: 0, flex: 1 }}>
+                              <Box
+                                sx={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 2.25,
+                                  background: style.gradient,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: style.color,
+                                  flexShrink: 0,
+                                  border: '1px solid',
+                                  borderColor: 'divider',
+                                }}
+                              >
+                                {style.icon}
+                              </Box>
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary', mb: 0.25, lineHeight: 1.25 }}>
+                                  {product.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650 }}>
+                                  {product.lineOfBusiness || 'Catálogo general'}
+                                </Typography>
+                              </Box>
+                            </Stack>
+
+                            {/* Right: Badges */}
+                            <Stack
+                              direction="row"
+                              spacing={1.5}
                               sx={{
-                                fontWeight: 700,
-                                fontSize: '0.65rem',
-                                height: 18,
-                                bgcolor: 'primary.soft',
-                                color: 'primary.main'
+                                alignItems: 'center',
+                                justifyContent: { xs: 'space-between', sm: 'flex-end' },
+                                flexShrink: 0,
                               }}
-                            />
-                            {product.lineOfBusiness && (
+                            >
                               <Chip
                                 size="small"
-                                label={product.lineOfBusiness}
-                                variant="outlined"
+                                label={t(productCategoryLabels, product.category)}
                                 sx={{
-                                  fontWeight: 660,
+                                  fontWeight: 750,
                                   fontSize: '0.65rem',
-                                  height: 18,
-                                  borderColor: 'divider'
+                                  height: 20,
+                                  bgcolor: style.softBg,
+                                  color: style.color,
                                 }}
                               />
-                            )}
-                          </Stack>
-                          
-                          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mt: 0.5 }}>
-                            <Box sx={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: '50%',
-                              bgcolor: product.status === 'Active' ? 'success.main' : 'text.disabled'
-                            }} />
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650 }}>
-                              {t(productStatusLabels, product.status)}
-                            </Typography>
-                          </Stack>
-                        </Stack>
-                      </Box>
-                    ))}
+                              
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.75,
+                                  px: 1.25,
+                                  py: 0.25,
+                                  borderRadius: 99,
+                                  bgcolor: product.status === 'Active' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(107, 114, 128, 0.08)',
+                                  border: '1px solid',
+                                  borderColor: product.status === 'Active' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(107, 114, 128, 0.15)',
+                                }}
+                              >
+                                <Box sx={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  bgcolor: product.status === 'Active' ? 'success.main' : 'text.disabled',
+                                  boxShadow: product.status === 'Active' ? '0 0 8px rgba(34, 197, 94, 0.8)' : 'none',
+                                }} />
+                                <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.65rem', color: product.status === 'Active' ? 'success.main' : 'text.secondary' }}>
+                                  {t(productStatusLabels, product.status)}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                          </Box>
+                        )
+                      })}
+                    </Stack>
                   </Box>
                 )}
               </Box>

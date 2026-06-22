@@ -37,15 +37,19 @@ const tagSchema = z.object({
 type TagFormData = z.infer<typeof tagSchema>
 
 export function TagsMaintenancePage() {
-  const { data: tags, error, loading, refetch } = useApiQuery('tags', fetchTags)
+  const [page, setPage] = useState(1)
+  const pageSize = 12
+  const { data: paginatedData, error, loading, refetch } = useApiQuery(
+    `tags-${page}-${pageSize}`,
+    () => fetchTags(page, pageSize)
+  )
   const canViewTags = usePermission('view_tags')
   const canManageTags = usePermission('manage_tags')
   const permissionsLoading = usePermissionLoading()
-  const [page, setPage] = useState(1)
-  const pageSize = 12
-  const allTags = tags ?? []
-  const totalPages = Math.ceil(allTags.length / pageSize)
-  const paginated = allTags.slice((page - 1) * pageSize, page * pageSize)
+  const allTags = paginatedData?.items ?? []
+  const totalCount = paginatedData?.total ?? 0
+  const totalPages = Math.ceil(totalCount / pageSize)
+  const paginated = allTags
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [selected, setSelected] = useState<TagRaw | null>(null)

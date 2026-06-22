@@ -33,11 +33,16 @@ const clientSchema = z.object({
 type ClientFormData = z.infer<typeof clientSchema>
 
 export function ClientsMaintenancePage() {
-  const { data: clients, error, loading, refetch } = useApiQuery('clients', fetchClients)
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
+  const { data: paginated, error, loading, refetch } = useApiQuery(
+    'clients-all',
+    () => fetchClients()
+  )
+  const clients = paginated?.items ?? []
+  const totalCount = paginated?.total ?? 0
   const canViewClients = usePermission('view_clients')
   const canManageClients = usePermission('manage_clients')
   const permissionsLoading = usePermissionLoading()
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>(() => createEmptyGridSelectionModel())
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
@@ -47,7 +52,8 @@ export function ClientsMaintenancePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const { data: policies } = useApiQuery('policies-for-clients-related', fetchPolicies)
+  const { data: policiesData } = useApiQuery('policies-for-clients-related', fetchPolicies)
+  const policies = policiesData?.items ?? []
   const [policiesDialogOpen, setPoliciesDialogOpen] = useState(false)
 
   const clientPolicies = useMemo<PolicyRaw[]>(() => {
@@ -232,7 +238,9 @@ export function ClientsMaintenancePage() {
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de clientes.</Alert>}
 
       <ResponsiveDataGrid
-        rows={clients ?? []}
+        rows={clients}
+        rowCount={totalCount}
+        paginationMode="client"
         columns={columns}
         getRowId={(row) => row.uuid}
         loading={loading}
@@ -241,7 +249,15 @@ export function ClientsMaintenancePage() {
         onRowSelectionModelChange={setRowSelectionModel}
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
-        onRowClick={(params) => {
+        onRowClick={(params, event) => {
+          const target = event.target as HTMLElement
+          if (
+            target.closest('.MuiDataGrid-cellCheckbox') ||
+            target.closest('.MuiCheckbox-root') ||
+            target.getAttribute('type') === 'checkbox'
+          ) {
+            return
+          }
           setSelected(params.row)
           setPoliciesDialogOpen(true)
         }}

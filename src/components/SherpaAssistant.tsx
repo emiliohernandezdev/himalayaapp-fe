@@ -269,7 +269,7 @@ function SummitAssistantInner() {
 
     setSubmittingAction(true)
     try {
-      const casesList = await fetchCases()
+      const casesList = (await fetchCases()).items
       const found = casesList.find(c => c.caseNumber.toUpperCase() === screenCtx.activeEntity?.idCode?.toUpperCase())
 
       if (!found) {
@@ -299,7 +299,7 @@ function SummitAssistantInner() {
 
     setSubmittingAction(true)
     try {
-      const casesList = await fetchCases()
+      const casesList = (await fetchCases()).items
       const found = casesList.find(c => c.caseNumber.toUpperCase() === screenCtx.activeEntity?.idCode?.toUpperCase())
 
       if (!found) {
@@ -478,7 +478,7 @@ Por favor procesa la siguiente solicitud del usuario:
     // 3. Database Command: List Clients
     if (normalized === 'listar clientes' || normalized === 'listar todos los clientes') {
       try {
-        const clientsList = await fetchClients()
+        const clientsList = (await fetchClients()).items
         setTimeout(() => {
           setAiResponse({
             title: 'Lista de Clientes (Local)',
@@ -495,7 +495,7 @@ Por favor procesa la siguiente solicitud del usuario:
     // 4. Database Command: List Policies
     if (normalized === 'listar polizas' || normalized === 'listar todas las polizas' || normalized === 'listar pólizas') {
       try {
-        const policiesList = await fetchPolicies()
+        const policiesList = (await fetchPolicies()).items
         setTimeout(() => {
           setAiResponse({
             title: 'Lista de Pólizas (Local)',
@@ -512,7 +512,7 @@ Por favor procesa la siguiente solicitud del usuario:
     // 5. Database Command: List Cases
     if (normalized === 'listar casos' || normalized === 'listar todos los casos') {
       try {
-        const casesList = await fetchCases()
+        const casesList = (await fetchCases()).items
         setTimeout(() => {
           setAiResponse({
             title: 'Lista de Casos y Siniestros (Local)',
@@ -571,7 +571,7 @@ Por favor procesa la siguiente solicitud del usuario:
       if (normalized.includes('cerrar caso')) {
         const words = normalized.toUpperCase().split(/\s+/)
         try {
-          const casesList = await fetchCases()
+          const casesList = (await fetchCases()).items
           const foundCase = casesList.find(c => 
             words.some(w => w === c.caseNumber.toUpperCase())
           )
@@ -672,7 +672,7 @@ Puedes intentar preguntarme:
   // Dynamic system actions
   const closeCaseDirectly = async (caseNumber: string) => {
     try {
-      const casesList = await fetchCases()
+      const casesList = (await fetchCases()).items
       const found = casesList.find(c => c.caseNumber.toUpperCase() === caseNumber.toUpperCase())
 
       if (!found) {

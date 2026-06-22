@@ -113,8 +113,11 @@ export type ProviderRaw = {
   taxId?: string | null
 }
 
-export function fetchProviders() {
-  return graphqlRequest<{ providers: ProviderRaw[] }>(graphqlOperationIds.providers).then((data) => data.providers)
+export function fetchProviders(page?: number, limit?: number) {
+  return graphqlRequest<{ providers: { items: ProviderRaw[]; total: number } }>(
+    graphqlOperationIds.providers,
+    { page, limit }
+  ).then((data) => data.providers)
 }
 
 export function createProvider(input: Record<string, unknown>) {
@@ -160,8 +163,11 @@ export type ProductRaw = {
   provider?: { uuid: string; name: string } | null
 }
 
-export function fetchProducts() {
-  return graphqlRequest<{ products: ProductRaw[] }>(graphqlOperationIds.products).then((data) => data.products)
+export function fetchProducts(page?: number, limit?: number) {
+  return graphqlRequest<{ products: { items: ProductRaw[]; total: number } }>(
+    graphqlOperationIds.products,
+    { page, limit }
+  ).then((data) => data.products)
 }
 
 export function createProduct(input: Record<string, unknown>) {
@@ -211,8 +217,11 @@ export type ClientRaw = {
   department?: string | null
 }
 
-export function fetchClients() {
-  return graphqlRequest<{ clients: ClientRaw[] }>(graphqlOperationIds.clients).then((data) => data.clients)
+export function fetchClients(page?: number, limit?: number) {
+  return graphqlRequest<{ clients: { items: ClientRaw[]; total: number } }>(
+    graphqlOperationIds.clients,
+    { page, limit }
+  ).then((data) => data.clients)
 }
 
 export function createClient(input: Record<string, unknown>) {
@@ -271,8 +280,11 @@ export type PolicyRaw = {
   product: { uuid: string; name: string }
 }
 
-export function fetchPolicies() {
-  return graphqlRequest<{ policies: PolicyRaw[] }>(graphqlOperationIds.policies).then((data) => data.policies)
+export function fetchPolicies(page?: number, limit?: number) {
+  return graphqlRequest<{ policies: { items: PolicyRaw[]; total: number } }>(
+    graphqlOperationIds.policies,
+    { page, limit }
+  ).then((data) => data.policies)
 }
 
 // ─── Cases ──────────────────────────────────────────────
@@ -294,8 +306,11 @@ export type CaseRaw = {
   tags?: { uuid: string; name: string; color: string }[]
 }
 
-export function fetchCases() {
-  return graphqlRequest<{ cases: CaseRaw[] }>(graphqlOperationIds.cases).then((data) => data.cases)
+export function fetchCases(page?: number, limit?: number) {
+  return graphqlRequest<{ cases: { items: CaseRaw[]; total: number } }>(
+    graphqlOperationIds.cases,
+    { page, limit }
+  ).then((data) => data.cases)
 }
 
 // ─── Tags ───────────────────────────────────────────────
@@ -307,8 +322,11 @@ export type TagRaw = {
   description?: string | null
 }
 
-export function fetchTags() {
-  return graphqlRequest<{ tags: TagRaw[] }>(graphqlOperationIds.tags).then((data) => data.tags)
+export function fetchTags(page?: number, limit?: number) {
+  return graphqlRequest<{ tags: { items: TagRaw[]; total: number } }>(
+    graphqlOperationIds.tags,
+    { page, limit }
+  ).then((data) => data.tags)
 }
 
 export function createTag(input: Record<string, unknown>) {
@@ -535,8 +553,11 @@ export type WidgetRaw = {
   enabled: boolean
 }
 
-export function fetchWidgets() {
-  return graphqlRequest<{ widgets: WidgetRaw[] }>(graphqlOperationIds.widgets).then((data) => data.widgets)
+export function fetchWidgets(page?: number, limit?: number) {
+  return graphqlRequest<{ widgets: { items: WidgetRaw[]; total: number } }>(
+    graphqlOperationIds.widgets,
+    { page, limit }
+  ).then((data) => data.widgets)
 }
 
 export function createWidget(input: Record<string, unknown>) {

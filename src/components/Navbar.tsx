@@ -406,8 +406,8 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
     handleNotificationMenuClose()
 
     try {
-      const policies = await fetchPolicies()
-      setPolicyDialogPolicies(filterPoliciesForNotification(policies, notification))
+      const policiesData = await fetchPolicies()
+      setPolicyDialogPolicies(filterPoliciesForNotification(policiesData.items, notification))
     } catch (error) {
       toast.error('No se pudieron cargar las pólizas de la notificación')
       setPolicyDialogPolicies([])

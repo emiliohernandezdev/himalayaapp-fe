@@ -93,15 +93,19 @@ const widgetSchema = z.object({
 type WidgetFormData = z.infer<typeof widgetSchema>
 
 export function WidgetsMaintenancePage() {
-  const { data: widgets, error, loading, refetch } = useApiQuery('widgets', fetchWidgets)
+  const [page, setPage] = useState(1)
+  const pageSize = 8
+  const { data: paginatedData, error, loading, refetch } = useApiQuery(
+    `widgets-${page}-${pageSize}`,
+    () => fetchWidgets(page, pageSize)
+  )
   const canViewWidgets = usePermission('view_widgets')
   const canManageWidgets = usePermission('manage_widgets')
   const permissionsLoading = usePermissionLoading()
-  const [page, setPage] = useState(1)
-  const pageSize = 8
-  const allWidgets = widgets ?? []
-  const totalPages = Math.ceil(allWidgets.length / pageSize)
-  const paginated = allWidgets.slice((page - 1) * pageSize, page * pageSize)
+  const allWidgets = paginatedData?.items ?? []
+  const totalCount = paginatedData?.total ?? 0
+  const totalPages = Math.ceil(totalCount / pageSize)
+  const paginated = allWidgets
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [selected, setSelected] = useState<WidgetRaw | null>(null)

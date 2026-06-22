@@ -34,12 +34,18 @@ const productSchema = z.object({
 type ProductFormData = z.infer<typeof productSchema>
 
 export function ProductsMaintenancePage() {
-  const { data: products, error, loading, refetch } = useApiQuery('products', fetchProducts)
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
+  const { data: paginated, error, loading, refetch } = useApiQuery(
+    'products-all',
+    () => fetchProducts()
+  )
+  const products = paginated?.items ?? []
+  const totalCount = paginated?.total ?? 0
   const canViewProducts = usePermission('view_products')
   const canManageProducts = usePermission('manage_products')
-  const { data: providers } = useApiQuery('providers-for-select', fetchProviders)
+  const { data: providersData } = useApiQuery('providers-for-select', fetchProviders)
+  const providers = providersData?.items ?? []
   const permissionsLoading = usePermissionLoading()
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>(() => createEmptyGridSelectionModel())
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
@@ -228,6 +234,8 @@ export function ProductsMaintenancePage() {
       <ResponsiveDataGrid
         height={580}
         rows={filteredProducts}
+        rowCount={totalCount}
+        paginationMode="client"
         columns={columns}
         getRowId={(row) => row.uuid}
         loading={loading}

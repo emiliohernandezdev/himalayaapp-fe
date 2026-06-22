@@ -1490,18 +1490,27 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
 
 export function CasesMaintenancePage() {
   const { id } = useParams()
-  const { data: cases, error, loading, refetch } = useApiQuery('cases', fetchCases)
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
+  const { data: paginated, error, loading, refetch } = useApiQuery(
+    'cases-all',
+    () => fetchCases()
+  )
+  const cases = paginated?.items ?? []
+  const totalCount = paginated?.total ?? 0
+
   const canViewCases = usePermission('view_cases')
   const canCreateCase = usePermission('create_case')
   const canEditCase = usePermission('edit_case')
   const canDeleteCase = usePermission('delete_case')
   const permissionsLoading = usePermissionLoading()
-  const { data: clients } = useApiQuery('clients-for-select', fetchClients)
-  const { data: policies } = useApiQuery('policies-for-select', fetchPolicies)
+  const { data: clientsData } = useApiQuery('clients-for-select', fetchClients)
+  const clients = clientsData?.items ?? []
+  const { data: policiesData } = useApiQuery('policies-for-select', fetchPolicies)
+  const policies = policiesData?.items ?? []
   const { data: users } = useApiQuery('users-for-select', fetchUsers)
-  const { data: tags } = useApiQuery('tags-for-select', fetchTags)
+  const { data: tagsData } = useApiQuery('tags-for-select', fetchTags)
+  const tags = tagsData?.items ?? []
 
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>(() => createEmptyGridSelectionModel())
   const [drawerCaseId, setDrawerCaseId] = useState<string | null>(null)
 
@@ -1802,7 +1811,9 @@ export function CasesMaintenancePage() {
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de casos.</Alert>}
 
       <ResponsiveDataGrid
-        rows={cases ?? []}
+        rows={cases}
+        rowCount={totalCount}
+        paginationMode="client"
         columns={columns}
         getRowId={(row) => row.uuid}
         loading={loading}
@@ -1811,7 +1822,17 @@ export function CasesMaintenancePage() {
         onRowSelectionModelChange={setRowSelectionModel}
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
-        onRowClick={(params) => setDrawerCaseId(params.row.uuid)}
+        onRowClick={(params, event) => {
+          const target = event.target as HTMLElement
+          if (
+            target.closest('.MuiDataGrid-cellCheckbox') ||
+            target.closest('.MuiCheckbox-root') ||
+            target.getAttribute('type') === 'checkbox'
+          ) {
+            return
+          }
+          setDrawerCaseId(params.row.uuid)
+        }}
         localeText={esESGrid}
         sx={{ cursor: 'pointer', '& .MuiDataGrid-row:hover': { bgcolor: 'action.hover' } }}
       />

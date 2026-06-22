@@ -2,6 +2,7 @@ import { Box, Checkbox, Skeleton, Stack, TablePagination, Typography, useMediaQu
 import { DataGrid } from '@mui/x-data-grid'
 import type { DataGridProps, GridColDef, GridRowId, GridRowSelectionModel, GridValidRowModel } from '@mui/x-data-grid'
 import { useCallback, type ReactNode } from 'react'
+import { Check } from 'lucide-react'
 import { esESGrid } from '../utils/enumLabels'
 
 type ResponsiveDataGridProps<R extends GridValidRowModel> = DataGridProps<R> & {
@@ -39,22 +40,56 @@ function defaultMobileRenderRow<R extends GridValidRowModel>(columns: readonly G
             } as any)
           }
           return (
-            <Typography variant="body2" sx={{ color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Typography variant="body2" sx={{ color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
               {valueStr}
             </Typography>
           )
         }
 
+        const isCodeField =
+          column.field.toLowerCase().includes('number') ||
+          column.field.toLowerCase().includes('id') ||
+          column.field.toLowerCase().includes('code') ||
+          column.field.toLowerCase().includes('uuid') ||
+          valueStr.startsWith('#')
+
         return (
           <Box key={column.field} sx={{ minWidth: 0 }}>
             {index === 0 ? (
-              <Typography sx={{ fontWeight: 800, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {valueStr}
-              </Typography>
+              isCodeField ? (
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5, flexWrap: 'wrap', gap: 0.5 }}>
+                  <Box
+                    sx={{
+                      px: 1,
+                      py: 0.25,
+                      borderRadius: 1.5,
+                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.2)' : 'rgba(2, 132, 199, 0.08)',
+                      color: 'primary.main',
+                      fontSize: '0.65rem',
+                      fontWeight: 900,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      border: '1px solid',
+                      borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(2, 132, 199, 0.3)' : 'rgba(2, 132, 199, 0.15)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    {column.headerName ?? column.field}
+                  </Box>
+                  <Typography sx={{ fontWeight: 900, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.95rem', fontFamily: 'monospace', letterSpacing: '0.02em' }}>
+                    {valueStr}
+                  </Typography>
+                </Stack>
+              ) : (
+                <Typography sx={{ fontWeight: 800, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '1rem', mb: 0.5 }}>
+                  {valueStr}
+                </Typography>
+              )
             ) : (
-              <Stack direction="row" spacing={1} sx={{ minWidth: 0, alignItems: 'center' }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary', minWidth: 82, flexShrink: 0 }}>
-                  {column.headerName ?? column.field}
+              <Stack direction="row" spacing={0.75} sx={{ minWidth: 0, alignItems: 'baseline' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0, fontSize: '0.7rem' }}>
+                  {column.headerName ?? column.field}:
                 </Typography>
                 {renderValue()}
               </Stack>
@@ -82,27 +117,75 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
   const page = paginationModel?.page ?? 0
   const pageSize = paginationModel?.pageSize ?? 10
   const rows = [...(props.rows ?? [])]
-  const mobileRows = rows.slice(page * pageSize, page * pageSize + pageSize)
+  const isServerPagination = props.paginationMode === 'server'
+  const mobileRows = isServerPagination ? rows : rows.slice(page * pageSize, page * pageSize + pageSize)
+  const totalRowCount = isServerPagination ? (props.rowCount ?? rows.length) : rows.length
   const numericPageSizeOptions = (pageSizeOptions ?? [10, 25, 50]).filter((option): option is number => typeof option === 'number')
   const getRowId = (row: R) => props.getRowId ? props.getRowId(row) : row.id
   const defaultDesktopRowHeight = useCallback(() => 'auto' as const, [])
   const isMobileRowSelected = (id: GridRowId) => {
     const model = props.rowSelectionModel as GridRowSelectionModel | GridRowId[] | undefined
     if (!model) return false
-    if (Array.isArray(model)) return model.includes(id)
-    return model.type === 'exclude' ? !model.ids.has(id) : model.ids.has(id)
+    
+    const idStr = String(id)
+    if (Array.isArray(model)) {
+      return model.map(String).includes(idStr)
+    }
+    
+    if (model.ids) {
+      if (model.ids.has(id)) return true
+      for (const item of model.ids) {
+        if (String(item) === idStr) return true
+      }
+    }
+    
+    if (model.type === 'exclude') {
+      return true
+    }
+    
+    return false
   }
+
   const toggleMobileRowSelection = (id: GridRowId) => {
     const allRowIds = rows.map(getRowId)
     const currentModel = props.rowSelectionModel as GridRowSelectionModel | GridRowId[] | undefined
-    const currentIds = Array.isArray(currentModel)
-      ? new Set<GridRowId>(currentModel)
-      : currentModel?.type === 'exclude'
-        ? new Set<GridRowId>(allRowIds.filter((rowId) => !currentModel.ids.has(rowId)))
-        : new Set<GridRowId>(currentModel?.ids ?? [])
+    
+    const currentIds = new Set<GridRowId>()
+    if (Array.isArray(currentModel)) {
+      currentModel.forEach((item) => currentIds.add(item))
+    } else if (currentModel) {
+      if (currentModel.type === 'exclude') {
+        allRowIds.forEach((rowId) => {
+          let hasRowId = currentModel.ids.has(rowId)
+          if (!hasRowId) {
+            const rowIdStr = String(rowId)
+            for (const item of currentModel.ids) {
+              if (String(item) === rowIdStr) {
+                hasRowId = true
+                break
+              }
+            }
+          }
+          if (!hasRowId) {
+            currentIds.add(rowId)
+          }
+        })
+      } else if (currentModel.ids) {
+        currentModel.ids.forEach((item) => currentIds.add(item))
+      }
+    }
 
-    if (currentIds.has(id)) {
-      currentIds.delete(id)
+    const idStr = String(id)
+    let foundItem: GridRowId | null = null
+    for (const item of currentIds) {
+      if (String(item) === idStr) {
+        foundItem = item
+        break
+      }
+    }
+
+    if (foundItem !== null) {
+      currentIds.delete(foundItem)
     } else {
       currentIds.add(id)
     }
@@ -110,37 +193,6 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
     props.onRowSelectionModelChange?.({ type: 'include', ids: currentIds }, {} as any)
   }
 
-  const checkboxSx = {
-    width: 34,
-    height: 34,
-    borderRadius: 2,
-    color: 'primary.main',
-    transition: 'background-color 0.16s ease, transform 0.16s ease',
-    '&:hover': {
-      bgcolor: 'action.selected',
-      transform: 'scale(1.04)',
-    },
-    '& .MuiSvgIcon-root': {
-      width: 22,
-      height: 22,
-      borderRadius: 1.15,
-      color: 'transparent',
-      border: '2px solid',
-      borderColor: 'primary.main',
-      bgcolor: 'transparent',
-      boxShadow: '0 0 0 3px color-mix(in srgb, var(--himalaya-primary) 8%, transparent)',
-      transition: 'all 0.16s ease',
-    },
-    '&.Mui-checked .MuiSvgIcon-root, &.MuiCheckbox-indeterminate .MuiSvgIcon-root': {
-      color: 'primary.contrastText',
-      borderColor: 'primary.main',
-      bgcolor: 'primary.main',
-      boxShadow: '0 8px 18px color-mix(in srgb, var(--himalaya-primary) 28%, transparent)',
-    },
-    '&.Mui-disabled': {
-      opacity: 0.45,
-    },
-  } as const
 
   if (isMobile) {
     const isLoading = Boolean(props.loading)
@@ -211,11 +263,56 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
                   {props.checkboxSelection && (
                     <Checkbox
                       checked={selected}
-                      onClick={(event) => {
-                        event.stopPropagation()
+                      onChange={() => {
                         toggleMobileRowSelection(id)
                       }}
-                      sx={{ ...checkboxSx, mt: -0.5, ml: -0.75, flexShrink: 0 }}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                      }}
+                      icon={
+                        <Box
+                          sx={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: '50%',
+                            border: '2px solid',
+                            borderColor: 'primary.main',
+                            bgcolor: 'transparent',
+                            transition: 'all 0.16s ease',
+                          }}
+                        />
+                      }
+                      checkedIcon={
+                        <Box
+                          sx={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: '50%',
+                            bgcolor: 'primary.main',
+                            borderColor: 'primary.main',
+                            border: '2px solid',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'primary.contrastText',
+                            boxShadow: (theme) => theme.palette.mode === 'dark'
+                              ? '0 0 14px rgba(2, 132, 199, 0.4)'
+                              : '0 4px 12px rgba(2, 132, 199, 0.3)',
+                            transition: 'all 0.16s ease',
+                          }}
+                        >
+                          <Check size={12} strokeWidth={3.5} />
+                        </Box>
+                      }
+                      sx={{
+                        p: 0.75,
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                        },
+                        mt: -0.5,
+                        ml: -0.75,
+                        flexShrink: 0,
+                      }}
                     />
                   )}
                   <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -235,7 +332,7 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
         </Stack>
         <TablePagination
           component="div"
-          count={rows.length}
+          count={totalRowCount}
           page={page}
           rowsPerPage={pageSize}
           rowsPerPageOptions={numericPageSizeOptions}
