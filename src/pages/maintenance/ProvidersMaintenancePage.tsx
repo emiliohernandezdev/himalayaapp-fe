@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Pagination, Stack, TextField, Typography } from '@mui/material'
-import { Building2, Edit2, MoreVertical, Plus, Trash2 } from 'lucide-react'
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Pagination, Stack, TextField, Typography } from '@mui/material'
+import { Building2, Edit2, MoreVertical, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -12,23 +12,36 @@ import { PageHeader } from '../../components/PageHeader'
 import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { providerStatusLabels, providerTypeLabels, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
+import { MaintenanceFab } from '../../components/MaintenanceFab'
 
 const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((val) => (val === '' ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
 
 const providerSchema = z.object({
-  name: z.string().min(2, 'Mínimo 2 caracteres'),
-  contactName: emptyToUndefined(z.string().optional()),
-  contactEmail: emptyToUndefined(z.string().email('Email inválido').optional()),
-  contactPhone: emptyToUndefined(z.string().optional()),
+  name: z.string().trim().min(2, 'El nombre del proveedor es requerido (mínimo 2 caracteres)'),
+  contactName: z.string().trim().min(2, 'El nombre de contacto es requerido (mínimo 2 caracteres)'),
+  contactEmail: z.string().trim().min(1, 'El correo electrónico es requerido').email('Ingresa un correo electrónico válido'),
+  contactPhone: z.string().trim().min(8, 'El teléfono es requerido (mínimo 8 dígitos)'),
   logo: emptyToUndefined(z.string().url('Debe ser una URL válida').optional()),
-  address: emptyToUndefined(z.string().optional()),
-  taxId: emptyToUndefined(z.string().optional()),
+  address: z.string().trim().min(1, 'La dirección es requerida'),
+  taxId: z.string().trim().min(1, 'El NIT / RFC es requerido'),
   type: z.enum(['InsuranceCompany', 'SuretyCompany', 'ServiceProvider']),
   status: z.enum(['Active', 'Inactive', 'UnderReview']),
 })
 
 type ProviderFormData = z.infer<typeof providerSchema>
+
+const avatarColors = ['#075985', '#0f766e', '#7c3aed', '#be123c', '#b45309', '#047857', '#0369a1', '#475569']
+
+function providerInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  return parts.slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'PR'
+}
+
+function providerAvatarColor(name: string) {
+  const sum = Array.from(name).reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  return avatarColors[sum % avatarColors.length]
+}
 
 export function ProvidersMaintenancePage() {
   const { data: records, error, loading, refetch } = useApiQuery('providers', fetchProviders)
@@ -133,12 +146,6 @@ export function ProvidersMaintenancePage() {
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Proveedores" description="Aseguradoras, afianzadoras y contactos comerciales." actionLabel="" icon={Building2} />
         </Box>
-        {canManageProviders && (
-          <Button variant="contained" color="primary" startIcon={<Plus size={20} />} onClick={openCreate}
-            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-            Nuevo proveedor
-          </Button>
-        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de proveedores.</Alert>}
@@ -154,23 +161,46 @@ export function ProvidersMaintenancePage() {
       <Box className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {loading
           ? Array.from({ length: 8 }).map((_, i) => (
-              <Box key={i} sx={{ height: 160, borderRadius: 3, bgcolor: 'background.paper', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+              <Box key={i} sx={{ height: 160, borderRadius: 3, bgcolor: 'var(--himalaya-surface-soft)', border: '1px solid', borderColor: 'divider', animation: 'himalaya-skeleton-pulse 1.8s ease-in-out infinite' }} />
             ))
           : paginatedProviders.map((provider) => (
               <Box key={provider.uuid} sx={{
                 display: 'flex', flexDirection: 'column',
-                bgcolor: 'background.paper', borderRadius: 3,
+                position: 'relative',
+                overflow: 'hidden',
+                bgcolor: 'background.paper', borderRadius: 4,
                 border: '1px solid', borderColor: 'divider',
-                p: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.05)',
+                p: 3, boxShadow: 'var(--himalaya-shadow)',
                 transition: 'all 0.2s ease-in-out',
-                '&:hover': { transform: 'translateY(-2px)', borderColor: 'primary.main' }
+                minHeight: 190,
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--himalaya-primary) 16%, transparent), transparent 34%)',
+                  pointerEvents: 'none',
+                },
+                '&:hover': { transform: 'translateY(-4px)', borderColor: 'primary.main', boxShadow: '0 24px 60px rgba(7,89,133,0.18)' }
               }}>
-                <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                    {provider.logo
-                      ? <img src={provider.logo} alt={provider.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                      : <Building2 size={24} color="var(--mui-palette-primary-main)" />}
-                  </Box>
+                <Stack direction="row" sx={{ position: 'relative', zIndex: 1, justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                  <Avatar
+                    src={provider.logo || undefined}
+                    alt={provider.name}
+                    slotProps={{ img: { referrerPolicy: 'no-referrer' } }}
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      fontWeight: 900,
+                      fontSize: '1.05rem',
+                      bgcolor: providerAvatarColor(provider.name),
+                      color: '#fff',
+                      border: '3px solid',
+                      borderColor: 'background.paper',
+                      boxShadow: '0 14px 30px rgba(15,23,42,0.18)',
+                    }}
+                  >
+                    {providerInitials(provider.name)}
+                  </Avatar>
                   {canManageProviders && (
                     <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelected(provider) }} sx={{ color: 'text.secondary', mr: -1, mt: -1 }}>
                       <MoreVertical size={18} />
@@ -178,7 +208,7 @@ export function ProvidersMaintenancePage() {
                   )}
                 </Stack>
 
-                <Box sx={{ flexGrow: 1 }}>
+                <Box sx={{ position: 'relative', zIndex: 1, flexGrow: 1 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.2, mb: 0.5 }}>
                     {provider.name}
                   </Typography>
@@ -192,7 +222,7 @@ export function ProvidersMaintenancePage() {
                   )}
                 </Box>
 
-                <Box sx={{ mt: 2 }}>
+                <Box sx={{ position: 'relative', zIndex: 1, mt: 2 }}>
                   <Chip
                     label={t(providerStatusLabels, provider.status)}
                     size="small"
@@ -232,7 +262,7 @@ export function ProvidersMaintenancePage() {
           <DialogContent dividers sx={{ borderColor: 'divider' }}>
             <Stack spacing={3} sx={{ mt: 1 }}>
               <Controller name="name" control={control} render={({ field }) => (
-                <TextField {...field} label="Nombre del Proveedor *" fullWidth error={!!errors.name} helperText={errors.name?.message ?? ' '} />
+                <TextField {...field} type="text" label="Nombre del Proveedor *" fullWidth error={!!errors.name} helperText={errors.name?.message ?? ' '} />
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="type" control={control} render={({ field }) => (
@@ -243,7 +273,7 @@ export function ProvidersMaintenancePage() {
                   </TextField>
                 )} />
                 <Controller name="status" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Estado" fullWidth>
+                  <TextField {...field} select label="Estado *" fullWidth error={!!errors.status} helperText={errors.status?.message ?? ' '}>
                     <MenuItem value="Active">Activo</MenuItem>
                     <MenuItem value="Inactive">Inactivo</MenuItem>
                     <MenuItem value="UnderReview">En revisión</MenuItem>
@@ -251,24 +281,24 @@ export function ProvidersMaintenancePage() {
                 )} />
               </Stack>
               <Controller name="contactName" control={control} render={({ field }) => (
-                <TextField {...field} label="Nombre del Contacto" fullWidth error={!!errors.contactName} helperText={errors.contactName?.message?.toString() ?? ' '} />
+                <TextField {...field} type="text" label="Nombre del Contacto *" fullWidth error={!!errors.contactName} helperText={errors.contactName?.message ?? ' '} />
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="contactEmail" control={control} render={({ field }) => (
-                  <TextField {...field} label="Email de Contacto" fullWidth error={!!errors.contactEmail} helperText={errors.contactEmail?.message?.toString() ?? ' '} />
+                  <TextField {...field} type="email" label="Email de Contacto *" fullWidth error={!!errors.contactEmail} helperText={errors.contactEmail?.message ?? ' '} />
                 )} />
                 <Controller name="contactPhone" control={control} render={({ field }) => (
-                  <TextField {...field} label="Teléfono" fullWidth error={!!errors.contactPhone} helperText={errors.contactPhone?.message?.toString() ?? ' '} />
+                  <TextField {...field} type="tel" label="Teléfono *" fullWidth error={!!errors.contactPhone} helperText={errors.contactPhone?.message ?? ' '} />
                 )} />
               </Stack>
               <Controller name="taxId" control={control} render={({ field }) => (
-                <TextField {...field} label="NIT / RFC" fullWidth error={!!errors.taxId} helperText={errors.taxId?.message?.toString() ?? ' '} />
+                <TextField {...field} type="text" label="NIT / RFC *" fullWidth error={!!errors.taxId} helperText={errors.taxId?.message ?? ' '} />
               )} />
               <Controller name="logo" control={control} render={({ field }) => (
-                <TextField {...field} label="URL del Logo" fullWidth placeholder="https://..." error={!!errors.logo} helperText={errors.logo?.message?.toString() ?? ' '} />
+                <TextField {...field} type="url" label="URL del Logo" fullWidth placeholder="https://..." error={!!errors.logo} helperText={errors.logo?.message?.toString() ?? ' '} />
               )} />
               <Controller name="address" control={control} render={({ field }) => (
-                <TextField {...field} label="Dirección" fullWidth error={!!errors.address} helperText={errors.address?.message?.toString() ?? ' '} />
+                <TextField {...field} type="text" label="Dirección *" fullWidth error={!!errors.address} helperText={errors.address?.message ?? ' '} />
               )} />
             </Stack>
           </DialogContent>
@@ -309,6 +339,10 @@ export function ProvidersMaintenancePage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {canManageProviders && (
+        <MaintenanceFab label="Nuevo proveedor" onClick={openCreate} />
+      )}
     </Stack>
   )
 }

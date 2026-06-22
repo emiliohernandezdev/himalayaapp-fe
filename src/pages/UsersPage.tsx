@@ -164,29 +164,31 @@ export function UsersPage() {
         onRowClick={(p) => { setSelected(p.row); setForm({ ...p.row, password: '' }); setFormErrors({}); setOpen(true) }}
       />
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{selected ? 'Editar usuario' : 'Nuevo usuario'}</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Nombre" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} fullWidth error={!!formErrors.firstName} helperText={formErrors.firstName ?? 'Nombre real del usuario.'} />
-            <TextField label="Apellido" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} fullWidth error={!!formErrors.lastName} helperText={formErrors.lastName ?? 'Apellido real del usuario.'} />
-            <TextField label="Correo" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} fullWidth error={!!formErrors.email} helperText={formErrors.email ?? 'Se usara para iniciar sesion.'} />
-            <TextField label={selected ? 'Nueva contraseña' : 'Contraseña'} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} fullWidth error={!!formErrors.password} helperText={formErrors.password ?? (selected ? 'Opcional. Escríbela solo si deseas cambiarla.' : 'Mínimo 8 caracteres.')} />
-            <TextField select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as UserForm['status'] })} fullWidth error={!!formErrors.status} helperText={formErrors.status ?? 'Define si la cuenta puede acceder.'}>
-              {userStatuses.map((s) => <MenuItem key={s} value={s}>{userStatusLabels[s] ?? s}</MenuItem>)}
-            </TextField>
-            <FormControl fullWidth error={!!formErrors.roles}>
-              <InputLabel>Roles</InputLabel>
-              <Select multiple value={form.roles} input={<OutlinedInput label="Roles" />} onChange={(e) => setForm({ ...form, roles: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value })}>
-                {userRoles.map((r) => <MenuItem key={r} value={r}>{userRoleLabels[r]}</MenuItem>)}
-              </Select>
-              <FormHelperText>{formErrors.roles ?? 'Selecciona los permisos base del usuario.'}</FormHelperText>
-            </FormControl>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={save}>Guardar</Button>
-        </DialogActions>
+        <form onSubmit={(e) => { e.preventDefault(); save(); }} noValidate>
+          <DialogTitle>{selected ? 'Editar usuario' : 'Nuevo usuario'}</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField label="Nombre *" type="text" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} fullWidth error={!!formErrors.firstName} helperText={formErrors.firstName ?? 'Nombre real del usuario.'} />
+              <TextField label="Apellido *" type="text" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} fullWidth error={!!formErrors.lastName} helperText={formErrors.lastName ?? 'Apellido real del usuario.'} />
+              <TextField label="Correo *" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} fullWidth error={!!formErrors.email} helperText={formErrors.email ?? 'Se usará para iniciar sesión.'} />
+              <TextField label={selected ? 'Nueva contraseña' : 'Contraseña *'} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} fullWidth error={!!formErrors.password} helperText={formErrors.password ?? (selected ? 'Opcional. Escríbela solo si deseas cambiarla.' : 'Mínimo 8 caracteres.')} />
+              <TextField select label="Estado *" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as UserForm['status'] })} fullWidth error={!!formErrors.status} helperText={formErrors.status ?? 'Define si la cuenta puede acceder.'}>
+                {userStatuses.map((s) => <MenuItem key={s} value={s}>{userStatusLabels[s] ?? s}</MenuItem>)}
+              </TextField>
+              <FormControl fullWidth error={!!formErrors.roles}>
+                <InputLabel>Roles</InputLabel>
+                <Select multiple value={form.roles} input={<OutlinedInput label="Roles" />} onChange={(e) => setForm({ ...form, roles: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value })}>
+                  {userRoles.map((r) => <MenuItem key={r} value={r}>{userRoleLabels[r]}</MenuItem>)}
+                </Select>
+                <FormHelperText>{formErrors.roles ?? 'Selecciona los permisos base del usuario.'}</FormHelperText>
+              </FormControl>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="contained" type="submit">Guardar</Button>
+          </DialogActions>
+        </form>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}

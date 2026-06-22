@@ -27,6 +27,23 @@ export function AppShell({ mode, onToggleMode }: AppShellProps) {
   }, [location.pathname, clearError])
 
   useEffect(() => {
+    const releasePointerFocus = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target?.closest('button, [role="button"], .MuiButtonBase-root')) return
+
+      window.requestAnimationFrame(() => {
+        const activeElement = document.activeElement
+        if (activeElement instanceof HTMLElement && activeElement.matches('button, [role="button"], .MuiButtonBase-root')) {
+          activeElement.blur()
+        }
+      })
+    }
+
+    document.addEventListener('click', releasePointerFocus, true)
+    return () => document.removeEventListener('click', releasePointerFocus, true)
+  }, [])
+
+  useEffect(() => {
     if (!isAuthenticated || !token) return
 
     const controller = new AbortController()

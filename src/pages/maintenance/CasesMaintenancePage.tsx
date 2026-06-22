@@ -1,8 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Autocomplete, Avatar, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer, FormControlLabel, IconButton, Menu, MenuItem, Skeleton, Stack, Tab, Tabs, TextField, Typography, InputAdornment, alpha } from '@mui/material'
-import type { GridColDef } from '@mui/x-data-grid'
-import { ClipboardCheck, Clock, Edit2, MessageSquare, MoreVertical, Plus, Trash2, X, Eye, EyeOff } from 'lucide-react'
+import { Alert, Autocomplete, Avatar, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer, FormControlLabel, IconButton, Menu, MenuItem, Skeleton, Stack, Tab, Tabs, TextField, Typography, InputAdornment, Tooltip, alpha } from '@mui/material'
+import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
+import { ClipboardCheck, Clock, Edit2, MessageSquare, MoreVertical, Trash2, X, Eye, EyeOff, Send, Play, CheckCircle, RotateCcw, User, ShieldCheck, FileText, Mail, Phone, Calendar, AlertCircle } from 'lucide-react'
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useParams } from 'react-router'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -16,9 +17,11 @@ import { PageHeader } from '../../components/PageHeader'
 import { ResponsiveDataGrid } from '../../components/ResponsiveDataGrid'
 import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { useAuthStore } from '../../store/useAuthStore'
-import { casePriorityLabels, caseStatusLabels, caseTypeLabels, esESGrid, t } from '../../utils/enumLabels'
+import { casePriorityLabels, caseStatusLabels, caseTypeLabels, policyStatusLabels, esESGrid, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
+import { MaintenanceFab } from '../../components/MaintenanceFab'
 import { subscribeAppEvent } from '../../utils/appEvents'
+import { createEmptyGridSelectionModel, getSelectedGridIds } from '../../utils/gridSelection'
 
 /** Sanitize backend errors for user display */
 function friendlyError(err: any, fallback = 'Ocurrió un error inesperado.'): string {
@@ -188,10 +191,23 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
   const [showSupervisorPassword, setShowSupervisorPassword] = useState(false)
   const [isSubmittingClose, setIsSubmittingClose] = useState(false)
 
+  const [policyDialogOpen, setPolicyDialogOpen] = useState(false)
+  
   const { data: detail, loading, refetch } = useApiQuery(
     caseUuid ? `case-${caseUuid}` : '__none__',
     () => (caseUuid ? fetchCaseDetail(caseUuid) : Promise.resolve(null as unknown as CaseDetail)),
   )
+
+  const fullPolicy = useMemo(() => {
+    if (!detail?.policy) return null
+    return policies?.find(p => p.uuid === detail.policy?.uuid) || null
+  }, [detail, policies])
+
+  useEffect(() => {
+    if (caseUuid) {
+      setTab(0)
+    }
+  }, [caseUuid])
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -281,7 +297,7 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
             </>
           ) : (
             <>
-              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: 1 }}>
+              <Typography variant="caption" data-case-number={detail?.caseNumber} sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: 1 }}>
                 {detail?.caseNumber}
               </Typography>
               <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.3 }}>
@@ -294,57 +310,70 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
           {detail && (
             <>
               {(detail.status === 'InProgress' || detail.status === 'WaitingForClient' || detail.status === 'WaitingForProvider') && (
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  onClick={() => setCloseDialogOpen(true)}
-                  sx={{ mr: 1, textTransform: 'none', fontWeight: 600, height: 28 }}
-                >
-                  Cerrar
-                </Button>
+                <Tooltip title="Cerrar y archivar este caso de soporte" arrow>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                    onClick={() => setCloseDialogOpen(true)}
+                    startIcon={<CheckCircle size={14} />}
+                    sx={{ mr: 1, textTransform: 'none', fontWeight: 600, height: 28 }}
+                  >
+                    Cerrar Caso
+                  </Button>
+                </Tooltip>
               )}
               {detail.status === 'Pending' && (
-                <Button
-                  variant="outlined"
-                  color="success"
-                  size="small"
-                  disabled={isActivating}
-                  onClick={handleActivateCaseClick}
-                  startIcon={isActivating ? <CircularProgress size={14} color="inherit" /> : undefined}
-                  sx={{ mr: 1, textTransform: 'none', fontWeight: 600, height: 28 }}
-                >
-                  {isActivating ? 'Abriendo…' : 'Abrir'}
-                </Button>
+                <Tooltip title="Iniciar la atención del caso y cambiar estado a 'En proceso'" arrow>
+                  <Button
+                    variant="outlined"
+                    color="success"
+                    size="small"
+                    disabled={isActivating}
+                    onClick={handleActivateCaseClick}
+                    startIcon={isActivating ? <CircularProgress size={14} color="inherit" /> : <Play size={14} />}
+                    sx={{ mr: 1, textTransform: 'none', fontWeight: 600, height: 28 }}
+                  >
+                    {isActivating ? 'Abriendo…' : 'Iniciar Atención'}
+                  </Button>
+                </Tooltip>
               )}
               {(detail.status === 'Closed' || detail.status === 'Cancelled') && (
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  size="small"
-                  disabled={isActivating}
-                  onClick={handleActivateCaseClick}
-                  startIcon={isActivating ? <CircularProgress size={14} color="inherit" /> : undefined}
-                  sx={{ mr: 1, textTransform: 'none', fontWeight: 600, height: 28 }}
-                >
-                  {isActivating ? 'Activando…' : 'Re-activar'}
-                </Button>
+                <Tooltip title="Reabrir este caso para continuar la gestión" arrow>
+                  <Button
+                    variant="outlined"
+                    color="warning"
+                    size="small"
+                    disabled={isActivating}
+                    onClick={handleActivateCaseClick}
+                    startIcon={isActivating ? <CircularProgress size={14} color="inherit" /> : <RotateCcw size={14} />}
+                    sx={{ mr: 1, textTransform: 'none', fontWeight: 600, height: 28 }}
+                  >
+                    {isActivating ? 'Activando…' : 'Reabrir Caso'}
+                  </Button>
+                </Tooltip>
               )}
               {canEditCase && (
-                <IconButton onClick={() => onEdit(detail)} size="small" sx={{ color: 'text.secondary' }}>
-                  <Edit2 size={18} />
-                </IconButton>
+                <Tooltip title="Editar detalles del caso" arrow>
+                  <IconButton onClick={() => onEdit(detail)} size="small" sx={{ color: 'text.secondary', mr: 0.5 }}>
+                    <Edit2 size={18} />
+                  </IconButton>
+                </Tooltip>
               )}
               {canDeleteCase && (
-                <IconButton onClick={() => onDelete(detail)} size="small" sx={{ color: 'error.main' }}>
-                  <Trash2 size={18} />
-                </IconButton>
+                <Tooltip title="Eliminar caso permanentemente" arrow>
+                  <IconButton onClick={() => onDelete(detail)} size="small" sx={{ color: 'error.main', mr: 0.5 }}>
+                    <Trash2 size={18} />
+                  </IconButton>
+                </Tooltip>
               )}
             </>
           )}
-          <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
-            <X size={20} />
-          </IconButton>
+          <Tooltip title="Cerrar panel de detalles" arrow>
+            <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
+              <X size={20} />
+            </IconButton>
+          </Tooltip>
         </Stack>
       </Stack>
 
@@ -371,7 +400,7 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
 
       {/* Tab content */}
       <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
-        {loading ? (
+        {loading && !detail ? (
           <Stack spacing={2}>
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} variant="text" height={28} />)}
           </Stack>
@@ -381,154 +410,502 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
             {tab === 0 && (
               <Stack spacing={3}>
                 {detail.description && (
-                  <Box>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>Descripción</Typography>
-                    <Typography variant="body2" sx={{ color: 'text.primary', mt: 0.5 }}>{detail.description}</Typography>
-                  </Box>
-                )}
-                <Box>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>Cliente</Typography>
-                  <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 600, mt: 0.5 }}>{detail.client.displayName}</Typography>
-                  {detail.client.email && <Typography variant="body2" sx={{ color: 'text.secondary' }}>{detail.client.email}</Typography>}
-                  {detail.client.phone && <Typography variant="body2" sx={{ color: 'text.secondary' }}>{detail.client.phone}</Typography>}
-                </Box>
-                {detail.policy && (
-                  <Box>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>Póliza</Typography>
-                    <Typography variant="body1" sx={{ color: 'text.primary', mt: 0.5 }}>{detail.policy.policyNumber}</Typography>
-                  </Box>
-                )}
-                {detail.assignedUser && (
-                  <Box>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>Responsable</Typography>
-                    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 0.5 }}>
-                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: 13 }}>
-                        {initials(detail.assignedUser.firstName, detail.assignedUser.lastName)}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600, lineHeight: 1.2 }}>
-                          {detail.assignedUser.firstName} {detail.assignedUser.lastName}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>{detail.assignedUser.email}</Typography>
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 3.5,
+                      border: '1px solid',
+                      borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(30, 30, 40, 0.4)' : 'rgba(255, 255, 255, 0.75)',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', mb: 1.5 }}>
+                      <Box sx={{ p: 0.75, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12), borderRadius: 1.5, color: 'primary.main', display: 'flex' }}>
+                        <FileText size={16} />
                       </Box>
-                    </Stack>
-                  </Box>
-                )}
-                <Divider />
-                <Stack spacing={1}>
-                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>Creado</Typography>
-                    <Typography variant="caption" sx={{ color: 'text.primary' }}>{formatDate(detail.createdAt)}</Typography>
-                  </Stack>
-                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>Última actualización</Typography>
-                    <Typography variant="caption" sx={{ color: 'text.primary' }}>{formatDate(detail.updatedAt)}</Typography>
-                  </Stack>
-                  {detail.dueAt && (
-                    <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>Vence</Typography>
-                      <Typography variant="caption" sx={{ color: new Date(detail.dueAt) < new Date() ? 'error.main' : 'text.primary' }}>
-                        {formatDate(detail.dueAt)}
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>
+                        Descripción del Caso
                       </Typography>
                     </Stack>
-                  )}
-                  {detail.closedAt && (
-                    <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>Cerrado</Typography>
-                      <Typography variant="caption" sx={{ color: 'text.primary' }}>{formatDate(detail.closedAt)}</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.primary', pl: 0.5, whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 13.5 }}>
+                      {detail.description}
+                    </Typography>
+                  </Box>
+                )}
+
+                <Stack direction="column" spacing={2.5}>
+                  {/* Cliente Card */}
+                  <Box
+                    sx={{
+                      flex: 1,
+                      p: 2.5,
+                      borderRadius: 3.5,
+                      border: '1px solid',
+                      borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(30, 30, 40, 0.4)' : 'rgba(255, 255, 255, 0.75)',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Box>
+                      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', mb: 2 }}>
+                        <Box sx={{ p: 0.75, bgcolor: (theme) => alpha(theme.palette.success.main, 0.12), borderRadius: 1.5, color: 'success.main', display: 'flex' }}>
+                          <User size={16} />
+                        </Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>
+                          Cliente
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2 }}>
+                        <Avatar sx={{ width: 40, height: 40, bgcolor: 'success.main', fontSize: 15, fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                          {detail.client.displayName[0]?.toUpperCase()}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {detail.client.displayName}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.25 }}>
+                            Cliente Asegurado
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Box>
+                    <Stack spacing={1} sx={{ mt: 'auto', pt: 1, borderTop: '1px solid', borderColor: 'divider', minWidth: 0 }}>
+                      {detail.client.email && (
+                        <Tooltip title="Enviar correo electrónico" arrow>
+                          <Button
+                            variant="text"
+                            size="small"
+                            component="a"
+                            href={`mailto:${detail.client.email}`}
+                            startIcon={<Mail size={14} />}
+                            sx={{ justifyContent: 'flex-start', textTransform: 'none', color: 'text.secondary', py: 0.5, fontSize: 12, '&:hover': { color: 'primary.main' }, minWidth: 0, width: '100%' }}
+                          >
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', width: '100%', textAlign: 'left' }}>
+                              {detail.client.email}
+                            </span>
+                          </Button>
+                        </Tooltip>
+                      )}
+                      {detail.client.phone && (
+                        <Tooltip title="Llamar al cliente" arrow>
+                          <Button
+                            variant="text"
+                            size="small"
+                            component="a"
+                            href={`tel:${detail.client.phone}`}
+                            startIcon={<Phone size={14} />}
+                            sx={{ justifyContent: 'flex-start', textTransform: 'none', color: 'text.secondary', py: 0.5, fontSize: 12, '&:hover': { color: 'primary.main' }, minWidth: 0, width: '100%' }}
+                          >
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', width: '100%', textAlign: 'left' }}>
+                              {detail.client.phone}
+                            </span>
+                          </Button>
+                        </Tooltip>
+                      )}
                     </Stack>
-                  )}
+                  </Box>
+
+                  {/* Responsable Card */}
+                  <Box
+                    sx={{
+                      flex: 1,
+                      p: 2.5,
+                      borderRadius: 3.5,
+                      border: '1px solid',
+                      borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(30, 30, 40, 0.4)' : 'rgba(255, 255, 255, 0.75)',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Box>
+                      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', mb: 2 }}>
+                        <Box sx={{ p: 0.75, bgcolor: (theme) => alpha(theme.palette.warning.main, 0.12), borderRadius: 1.5, color: 'warning.main', display: 'flex' }}>
+                          <ShieldCheck size={16} />
+                        </Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>
+                          Responsable
+                        </Typography>
+                      </Stack>
+                      {detail.assignedUser ? (
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2 }}>
+                          <Avatar sx={{ width: 40, height: 40, bgcolor: 'warning.main', fontSize: 15, fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                            {initials(detail.assignedUser.firstName, detail.assignedUser.lastName)}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {detail.assignedUser.firstName} {detail.assignedUser.lastName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.25 }}>
+                              Agente Asignado
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      ) : (
+                        <Box sx={{ py: 1.5, textAlign: 'center' }}>
+                          <Typography variant="body2" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                            Sin asignar
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                    {detail.assignedUser && (
+                      <Stack spacing={1} sx={{ mt: 'auto', pt: 1, borderTop: '1px solid', borderColor: 'divider', minWidth: 0 }}>
+                        <Tooltip title="Contactar responsable" arrow>
+                          <Button
+                            variant="text"
+                            size="small"
+                            component="a"
+                            href={`mailto:${detail.assignedUser.email}`}
+                            startIcon={<Mail size={14} />}
+                            sx={{ justifyContent: 'flex-start', textTransform: 'none', color: 'text.secondary', py: 0.5, fontSize: 12, '&:hover': { color: 'primary.main' }, minWidth: 0, width: '100%' }}
+                          >
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', width: '100%', textAlign: 'left' }}>
+                              {detail.assignedUser.email}
+                            </span>
+                          </Button>
+                        </Tooltip>
+                      </Stack>
+                    )}
+                  </Box>
                 </Stack>
+
+                {/* Póliza Card */}
+                {detail.policy ? (
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 3.5,
+                      border: '1px solid',
+                      borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(30, 30, 40, 0.4)' : 'rgba(255, 255, 255, 0.75)',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                      <Box sx={{ p: 1.25, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12), borderRadius: 2.5, color: 'primary.main', display: 'flex' }}>
+                        <ClipboardCheck size={20} />
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, display: 'block' }}>
+                          Póliza Asociada
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 800, color: 'text.primary', mt: 0.25 }}>
+                          {detail.policy.policyNumber}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => setPolicyDialogOpen(true)}
+                      startIcon={<Eye size={14} />}
+                      sx={{
+                        borderRadius: 2.5,
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        px: 2.5,
+                        py: 1,
+                        fontSize: 12.5,
+                        boxShadow: '0 4px 10px rgba(7, 89, 133, 0.15)',
+                      }}
+                    >
+                      Ver Póliza
+                    </Button>
+                  </Box>
+                ) : (
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 3.5,
+                      border: '1px dashed',
+                      borderColor: 'divider',
+                      bgcolor: 'action.hover',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 1.5,
+                    }}
+                  >
+                    <AlertCircle size={18} style={{ opacity: 0.5 }} />
+                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                      Este caso no tiene una póliza asociada.
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Timeline info row */}
+                <Box
+                  sx={{
+                    p: 2.5,
+                    borderRadius: 3.5,
+                    border: '1px solid',
+                    borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                    bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(30, 30, 40, 0.4)' : 'rgba(255, 255, 255, 0.75)',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+                  }}
+                >
+                  <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', mb: 2.5 }}>
+                    <Box sx={{ p: 0.75, bgcolor: (theme) => alpha(theme.palette.text.primary, 0.08), borderRadius: 1.5, color: 'text.primary', display: 'flex' }}>
+                      <Calendar size={16} />
+                    </Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>
+                      Línea de Tiempo del Caso
+                    </Typography>
+                  </Stack>
+                  <Stack spacing={1.75}>
+                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>Creado</Typography>
+                      <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 700 }}>{formatDate(detail.createdAt)}</Typography>
+                    </Stack>
+                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>Última actualización</Typography>
+                      <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 700 }}>{formatDate(detail.updatedAt)}</Typography>
+                    </Stack>
+                    {detail.dueAt && (
+                      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>Fecha límite</Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: new Date(detail.dueAt) < new Date() && (detail.status !== 'Closed' && detail.status !== 'closed') ? 'error.main' : 'text.primary',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5
+                          }}
+                        >
+                          {formatDate(detail.dueAt)}
+                          {new Date(detail.dueAt) < new Date() && (detail.status !== 'Closed' && detail.status !== 'closed') && (
+                            <Chip label="Vencido" size="small" color="error" sx={{ height: 16, fontSize: 9, fontWeight: 800 }} />
+                          )}
+                        </Typography>
+                      </Stack>
+                    )}
+                    {detail.closedAt && (
+                      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>Fecha de cierre</Typography>
+                        <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 700 }}>{formatDate(detail.closedAt)}</Typography>
+                      </Stack>
+                    )}
+                  </Stack>
+                </Box>
               </Stack>
             )}
 
             {/* Tab 1 – Comments */}
             {tab === 1 && (
-              <Stack spacing={3}>
-                <Box component="form" onSubmit={handleCommentSubmit} noValidate sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2 }}>
-                  <Stack spacing={2}>
-                    <TextField
-                      label="Nuevo comentario *"
-                      placeholder="Escribe una actualización o nota..."
-                      multiline
-                      rows={2}
-                      value={newCommentBody}
-                      onChange={(e) => setNewCommentBody(e.target.value)}
-                      fullWidth
+              <Stack spacing={3.5}>
+                {/* Composer card */}
+                <Box
+                  component="form"
+                  onSubmit={handleCommentSubmit}
+                  noValidate
+                  sx={{
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 3.5,
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                    transition: 'all 0.2s ease-in-out',
+                    '&:focus-within': {
+                      borderColor: newCommentInternal ? 'warning.main' : 'primary.main',
+                      boxShadow: newCommentInternal ? '0 4px 16px rgba(217, 119, 6, 0.08)' : '0 4px 16px rgba(7, 89, 133, 0.08)'
+                    }
+                  }}
+                >
+                  <TextField
+                    placeholder="Escribe un comentario o nota sobre este caso..."
+                    multiline
+                    rows={3}
+                    value={newCommentBody}
+                    onChange={(e) => setNewCommentBody(e.target.value)}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        p: 2,
+                        '& fieldset': { border: 'none' },
+                        '&:hover fieldset': { border: 'none' },
+                        '&.Mui-focused fieldset': { border: 'none' }
+                      }
+                    }}
+                  />
+                  <Divider />
+                  <Stack
+                    direction="row"
+                    sx={{
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      px: 2,
+                      py: 1.25,
+                      bgcolor: (theme) => alpha(theme.palette.text.primary, 0.01)
+                    }}
+                  >
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={newCommentInternal}
+                          onChange={(e) => setNewCommentInternal(e.target.checked)}
+                          size="small"
+                          sx={{
+                            color: 'warning.main',
+                            '&.Mui-checked': {
+                              color: 'warning.main'
+                            }
+                          }}
+                        />
+                      }
+                      label={
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: newCommentInternal ? 'warning.main' : 'text.secondary' }}>
+                          Nota interna (Privado)
+                        </Typography>
+                      }
                     />
-                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={newCommentInternal}
-                            onChange={(e) => setNewCommentInternal(e.target.checked)}
-                          />
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={isSubmittingComment || !newCommentBody.trim()}
+                      startIcon={isSubmittingComment ? <CircularProgress size={14} color="inherit" /> : <Send size={13} />}
+                      sx={{
+                        borderRadius: 2,
+                        px: 3,
+                        py: 0.75,
+                        fontSize: 13,
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        bgcolor: newCommentInternal ? 'warning.main' : 'primary.main',
+                        '&:hover': {
+                          bgcolor: newCommentInternal ? 'warning.dark' : 'primary.dark'
                         }
-                        label="Nota interna"
-                      />
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={isSubmittingComment || !newCommentBody.trim()}
-                        startIcon={isSubmittingComment ? <CircularProgress size={16} color="inherit" /> : undefined}
-                      >
-                        {isSubmittingComment ? 'Guardando…' : 'Comentar'}
-                      </Button>
-                    </Stack>
+                      }}
+                    >
+                      {isSubmittingComment ? 'Guardando…' : 'Comentar'}
+                    </Button>
                   </Stack>
                 </Box>
 
-                <Stack spacing={2}>
+                {/* Timeline thread list */}
+                <Stack spacing={3} sx={{ position: 'relative', pl: 1 }}>
+                  {detail.comments.length > 1 && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        left: 14,
+                        top: 24,
+                        bottom: 24,
+                        width: 2,
+                        bgcolor: 'divider',
+                        zIndex: 0
+                      }}
+                    />
+                  )}
                   {detail.comments.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 6 }}>
                       <MessageSquare size={40} style={{ opacity: 0.3, margin: '0 auto' }} strokeWidth={1} />
                       <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>Sin comentarios todavía.</Typography>
                     </Box>
                   ) : (
-                    detail.comments.map((comment) => (
-                      <Box
-                        key={comment.uuid}
-                        sx={{
-                          bgcolor: (theme) => comment.internalOnly ? alpha(theme.palette.warning.main, 0.08) : 'background.paper',
-                          borderRadius: 2,
-                          border: '1px solid',
-                          borderColor: (theme) => comment.internalOnly ? alpha(theme.palette.warning.main, 0.4) : 'divider',
-                          p: 2,
-                          transition: 'all 0.2s',
-                        }}
-                      >
-                        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
-                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: 13, flexShrink: 0 }}>
-                            {initials(comment.author.firstName, comment.author.lastName)}
-                          </Avatar>
-                          <Box sx={{ flexGrow: 1 }}>
-                            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                                {comment.author.firstName} {comment.author.lastName}
-                                {comment.internalOnly && (
-                                  <Chip
-                                    label="Interno"
-                                    size="small"
-                                    sx={{
-                                      ml: 1,
-                                      height: 16,
-                                      fontSize: 10,
-                                      bgcolor: (theme) => alpha(theme.palette.warning.main, 0.16),
-                                      color: 'warning.main',
-                                      border: '1px solid',
-                                      borderColor: (theme) => alpha(theme.palette.warning.main, 0.3),
-                                      fontWeight: 800,
-                                    }}
-                                  />
-                                )}
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>{formatDate(comment.createdAt)}</Typography>
-                            </Stack>
-                            <Typography variant="body2" sx={{ color: 'text.primary', mt: 0.5 }}>{comment.body}</Typography>
-                          </Box>
-                        </Stack>
-                      </Box>
-                    ))
+                    <AnimatePresence initial={false}>
+                      {[...detail.comments]
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map((comment) => {
+                          const isInternal = comment.internalOnly;
+                          return (
+                            <motion.div
+                              key={comment.uuid}
+                              initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -15, scale: 0.98 }}
+                              transition={{ duration: 0.25, ease: 'easeOut' }}
+                              style={{ width: '100%' }}
+                            >
+                              <Stack
+                                direction="row"
+                                spacing={2}
+                                sx={{ position: 'relative', zIndex: 1, alignItems: 'flex-start' }}
+                              >
+                                <Avatar
+                                  sx={{
+                                    width: 28,
+                                    height: 28,
+                                    bgcolor: isInternal ? 'warning.main' : 'primary.main',
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    flexShrink: 0,
+                                    mt: 0.5,
+                                    border: '2px solid',
+                                    borderColor: 'background.paper',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                  }}
+                                >
+                                  {initials(comment.author.firstName, comment.author.lastName)}
+                                </Avatar>
+                                <Box
+                                  sx={{
+                                    flexGrow: 1,
+                                    bgcolor: isInternal ? (theme) => alpha(theme.palette.warning.main, 0.05) : 'background.paper',
+                                    borderRadius: 3,
+                                    border: '1px solid',
+                                    borderColor: isInternal ? (theme) => alpha(theme.palette.warning.main, 0.3) : 'divider',
+                                    p: 2,
+                                    transition: 'all 0.2s',
+                                    '&:hover': {
+                                      boxShadow: '0 3px 10px rgba(0,0,0,0.02)',
+                                      borderColor: isInternal ? 'warning.main' : 'primary.main'
+                                    }
+                                  }}
+                                >
+                                  <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+                                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                                      <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', fontSize: 13.5 }}>
+                                        {comment.author.firstName} {comment.author.lastName}
+                                      </Typography>
+                                      {isInternal && (
+                                        <Chip
+                                          label="Nota Interna"
+                                          size="small"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: 9,
+                                            bgcolor: (theme) => alpha(theme.palette.warning.main, 0.12),
+                                            color: 'warning.main',
+                                            border: '1px solid',
+                                            borderColor: (theme) => alpha(theme.palette.warning.main, 0.25),
+                                            fontWeight: 800,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: 0.5
+                                          }}
+                                        />
+                                      )}
+                                    </Stack>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 11 }}>
+                                      {formatDate(comment.createdAt)}
+                                    </Typography>
+                                  </Stack>
+                                  <Typography variant="body2" sx={{ color: 'text.primary', mt: 0.5, lineHeight: 1.5, whiteSpace: 'pre-wrap', fontSize: 13 }}>
+                                    {comment.body}
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                            </motion.div>
+                          )
+                        })}
+                    </AnimatePresence>
                   )}
                 </Stack>
               </Stack>
@@ -663,7 +1040,7 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
                     const tagArray = Array.isArray(val) ? val : []
                     if (tagArray.length === 0) return <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography>
                     return (
-                      <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                      <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
                         {tagArray.map((item, idx) => {
                           let name = String(item)
                           let colorStr = '#075985'
@@ -706,21 +1083,44 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
                 if (keys.length === 0) return null
 
                 return (
-                  <Stack spacing={1} sx={{ mt: 1.5, p: 2, bgcolor: 'background.paper', borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <Stack spacing={2} sx={{ mt: 1.5, p: 2, bgcolor: 'background.paper', borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                     {keys.map((key) => {
                       const label = fieldLabels[key] ?? key
+                      const isLongField = ['description', 'title', 'tags', 'tagUuids', 'client', 'clientUuid', 'assignedUser', 'assignedUserUuid', 'policy', 'policyUuid'].includes(key)
                       return (
-                        <Box key={key} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' } }}>
+                        <Box
+                          key={key}
+                          sx={{
+                            display: 'flex',
+                            flexDirection: isLongField ? 'column' : 'row',
+                            alignItems: isLongField ? 'flex-start' : 'center',
+                            justifyContent: 'space-between',
+                            py: 1.5,
+                            gap: 1.5,
+                            borderBottom: '1px solid',
+                            borderColor: 'divider',
+                            '&:last-child': { borderBottom: 'none' }
+                          }}
+                        >
                           <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                             {label}
                           </Typography>
-                          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Stack
+                            direction="row"
+                            sx={{
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              width: '100%',
+                              justifyContent: isLongField ? 'flex-start' : 'flex-end',
+                              gap: 1.5
+                            }}
+                          >
                             {beforeStr && beforeObj[key] !== undefined && beforeObj[key] !== null && beforeObj[key] !== '' && (
                               <>
-                                <Box sx={{ opacity: 0.65 }}>
+                                <Box sx={{ opacity: 0.6 }}>
                                   {renderDiffValue(key, beforeObj[key])}
                                 </Box>
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem', fontWeight: 700 }}>
                                   →
                                 </Typography>
                               </>
@@ -744,31 +1144,36 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
                       <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>Sin historial de cambios.</Typography>
                     </Box>
                   ) : (
-                    detail.auditLogs.map((log, idx) => (
-                      <Box key={log.uuid} sx={{ display: 'flex', gap: 2 }}>
-                        {/* Timeline connector */}
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                          <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'primary.main', mt: 1, flexShrink: 0 }} />
-                          {idx < detail.auditLogs.length - 1 && <Box sx={{ width: 2, flex: 1, bgcolor: 'divider', my: 0.5 }} />}
+                    (() => {
+                      const sortedLogs = [...detail.auditLogs].sort(
+                        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                      )
+                      return sortedLogs.map((log, idx) => (
+                        <Box key={log.uuid} sx={{ display: 'flex', gap: 2 }}>
+                          {/* Timeline connector */}
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'primary.main', mt: 1, flexShrink: 0 }} />
+                            {idx < sortedLogs.length - 1 && <Box sx={{ width: 2, flex: 1, bgcolor: 'divider', my: 0.5 }} />}
+                          </Box>
+                          <Box sx={{ pb: 2, flex: 1 }}>
+                            <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: 12, fontWeight: 700 }}>
+                                {log.actor ? initials(log.actor.firstName, log.actor.lastName) : 'H'}
+                              </Avatar>
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }}>
+                                  {auditActionLabel(log.action)}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                                  {log.actor ? `${log.actor.firstName} ${log.actor.lastName}` : 'Sistema'} · {formatDate(log.createdAt)}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                            {renderAuditDiff(log.before, log.after)}
+                          </Box>
                         </Box>
-                        <Box sx={{ pb: 2, flex: 1 }}>
-                          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-                            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: 12, fontWeight: 700 }}>
-                              {log.actor ? initials(log.actor.firstName, log.actor.lastName) : 'H'}
-                            </Avatar>
-                            <Box sx={{ minWidth: 0 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }}>
-                                {auditActionLabel(log.action)}
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                                {log.actor ? `${log.actor.firstName} ${log.actor.lastName}` : 'Sistema'} · {formatDate(log.createdAt)}
-                              </Typography>
-                            </Box>
-                          </Stack>
-                          {renderAuditDiff(log.before, log.after)}
-                        </Box>
-                      </Box>
-                    ))
+                      ))
+                    })()
                   )}
                 </Stack>
               )
@@ -857,6 +1262,224 @@ function CaseDetailDrawer({ caseUuid, open, onClose, onEdit, onDelete, onRefresh
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Policy Dialog */}
+      <Dialog
+        open={policyDialogOpen}
+        onClose={() => setPolicyDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 4,
+              bgcolor: 'background.paper',
+              backgroundImage: 'none',
+              boxShadow: '0 24px 48px rgba(0,0,0,0.12)',
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, px: 3.5, pt: 3.5, pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            <Box sx={{ p: 1, bgcolor: 'primary.light', borderRadius: 2, color: 'primary.main', display: 'flex', alignItems: 'center' }}>
+              <ClipboardCheck size={24} />
+            </Box>
+            <Box>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, letterSpacing: 0.5, display: 'block', textTransform: 'uppercase' }}>
+                Detalles de Póliza
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                {fullPolicy ? fullPolicy.policyNumber : detail?.policy?.policyNumber}
+              </Typography>
+            </Box>
+          </Stack>
+          <IconButton onClick={() => setPolicyDialogOpen(false)} size="small" sx={{ color: 'text.secondary' }}>
+            <X size={20} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3.5, py: 2 }}>
+          {fullPolicy ? (
+            <Stack spacing={3} sx={{ mt: 1.5 }}>
+              {/* Status & Provider Header Card */}
+              <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Aseguradora</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>{fullPolicy.provider?.name ?? '—'}</Typography>
+                </Box>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600, mb: 0.5 }}>Estado</Typography>
+                  <Chip
+                    label={t(policyStatusLabels, fullPolicy.status)}
+                    size="small"
+                    sx={{
+                      fontWeight: 700,
+                      bgcolor: fullPolicy.status.toLowerCase() === 'active' || fullPolicy.status.toLowerCase() === 'vigente' ? 'success.main' :
+                               fullPolicy.status.toLowerCase() === 'draft' || fullPolicy.status.toLowerCase() === 'borrador' ? 'warning.main' :
+                               fullPolicy.status.toLowerCase() === 'expired' || fullPolicy.status.toLowerCase() === 'vencida' ? 'error.main' : 'action.disabledBackground',
+                      color: fullPolicy.status.toLowerCase() === 'active' || fullPolicy.status.toLowerCase() === 'vigente' ? 'success.contrastText' :
+                             fullPolicy.status.toLowerCase() === 'draft' || fullPolicy.status.toLowerCase() === 'borrador' ? 'warning.contrastText' :
+                             fullPolicy.status.toLowerCase() === 'expired' || fullPolicy.status.toLowerCase() === 'vencida' ? 'error.contrastText' : 'text.secondary'
+                    }}
+                  />
+                </Box>
+              </Stack>
+
+              {/* Grid de Datos */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2.5 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Plan / Producto</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5 }}>{fullPolicy.product?.name ?? '—'}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Cliente Titular</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5 }}>{fullPolicy.client?.displayName ?? '—'}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Moneda</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5 }}>{fullPolicy.currency}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Prima Anual</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'success.main', mt: 0.5 }}>
+                    {fullPolicy.premiumAmount != null
+                      ? `${fullPolicy.currency === 'GTQ' ? 'Q' : '$'}${Number(fullPolicy.premiumAmount).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '—'}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Suma Asegurada</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5 }}>
+                    {fullPolicy.insuredAmount != null
+                      ? `${fullPolicy.currency === 'GTQ' ? 'Q' : '$'}${Number(fullPolicy.insuredAmount).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '—'}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Vigencia</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5 }}>
+                    {dayjs(fullPolicy.startDate).format('DD/MM/YYYY')} - {dayjs(fullPolicy.endDate).format('DD/MM/YYYY')}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Divider sx={{ my: 1 }} />
+
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box component="span" sx={{ display: 'inline-flex', color: 'primary.main' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                  </Box>
+                  Información Financiera y de Pago
+                </Typography>
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2.5 }}>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Método de Pago</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                      {fullPolicy.paymentMethod === 'card' && (
+                        <>
+                          {fullPolicy.cardBrand === 'visa' && (
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#0ea5e9', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span style={{ fontSize: 11, background: '#0ea5e9', color: '#fff', padding: '1px 4px', borderRadius: 2, fontWeight: 900 }}>VISA</span>
+                              {fullPolicy.cardLastFour ? `•••• ${fullPolicy.cardLastFour}` : ''}
+                            </Typography>
+                          )}
+                          {fullPolicy.cardBrand === 'mastercard' && (
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#f97316', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span style={{ fontSize: 11, background: '#f97316', color: '#fff', padding: '1px 4px', borderRadius: 2, fontWeight: 900 }}>MC</span>
+                              {fullPolicy.cardLastFour ? `•••• ${fullPolicy.cardLastFour}` : ''}
+                            </Typography>
+                          )}
+                          {fullPolicy.cardBrand === 'amex' && (
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#06b6d4', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span style={{ fontSize: 11, background: '#06b6d4', color: '#fff', padding: '1px 4px', borderRadius: 2, fontWeight: 900 }}>AMEX</span>
+                              {fullPolicy.cardLastFour ? `•••• ${fullPolicy.cardLastFour}` : ''}
+                            </Typography>
+                          )}
+                          {!['visa', 'mastercard', 'amex'].includes(fullPolicy.cardBrand || '') && (
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                              Tarjeta {fullPolicy.cardLastFour ? `•••• ${fullPolicy.cardLastFour}` : ''}
+                            </Typography>
+                          )}
+                        </>
+                      )}
+                      {fullPolicy.paymentMethod === 'transfer' && (
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                          Transferencia Bancaria
+                        </Typography>
+                      )}
+                      {fullPolicy.paymentMethod === 'cash' && (
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                          Efectivo
+                        </Typography>
+                      )}
+                      {!fullPolicy.paymentMethod && (
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary', fontStyle: 'italic' }}>
+                          No especificado
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Periodicidad de Cobro</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5 }}>
+                      {fullPolicy.billingFrequency === 'single' && 'Pago Único'}
+                      {fullPolicy.billingFrequency === 'monthly' && 'Mensual'}
+                      {fullPolicy.billingFrequency === 'quarterly' && 'Trimestral'}
+                      {fullPolicy.billingFrequency === 'semi_annually' && 'Semestral'}
+                      {fullPolicy.billingFrequency === 'annually' && 'Anual'}
+                      {!fullPolicy.billingFrequency && '—'}
+                    </Typography>
+                  </Box>
+
+                  {fullPolicy.billingFrequency && fullPolicy.billingFrequency !== 'single' && (
+                    <>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Cuotas Totales</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5 }}>
+                          {fullPolicy.billingInstallments ?? '—'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Monto por Cuota</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: 'success.main', mt: 0.5 }}>
+                          {fullPolicy.installmentAmount != null
+                            ? `${fullPolicy.currency === 'GTQ' ? 'Q' : '$'}${Number(fullPolicy.installmentAmount).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : '—'}
+                        </Typography>
+                      </Box>
+                    </>
+                  )}
+                </Box>
+              </Box>
+
+              {/* Notes */}
+              {fullPolicy.notes && (
+                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600, mb: 0.5 }}>Notas / Observaciones</Typography>
+                  <Typography variant="body2" sx={{ color: 'text.primary', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                    {fullPolicy.notes}
+                  </Typography>
+                </Box>
+              )}
+            </Stack>
+          ) : (
+            <Stack sx={{ py: 6, alignItems: 'center', justifyContent: 'center' }}>
+              <AlertCircle size={40} style={{ opacity: 0.3 }} />
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>
+                No se encontraron detalles ampliados para la póliza asociada.
+              </Typography>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setPolicyDialogOpen(false)} variant="contained" fullWidth sx={{ borderRadius: 2.5, textTransform: 'none', fontWeight: 700 }}>
+            Entendido
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Drawer>
   )
 }
@@ -877,6 +1500,7 @@ export function CasesMaintenancePage() {
   const { data: tags } = useApiQuery('tags-for-select', fetchTags)
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
+  const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>(() => createEmptyGridSelectionModel())
   const [drawerCaseId, setDrawerCaseId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -895,8 +1519,14 @@ export function CasesMaintenancePage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [selectedCase, setSelectedCase] = useState<CaseRaw | CaseDetail | null>(null)
+  const selectedIds = useMemo(
+    () => getSelectedGridIds(rowSelectionModel, (cases ?? []).map((supportCase) => supportCase.uuid)),
+    [cases, rowSelectionModel],
+  )
+  const selectedCount = selectedIds.length
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   // Flag to skip the policy-clear effect during programmatic form resets
@@ -980,8 +1610,7 @@ export function CasesMaintenancePage() {
     try {
       const input = normalizeCaseInput(data)
       if (dialogMode === 'create') {
-        const caseNumber = `CAS-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
-        await createCase({ ...input, caseNumber })
+        await createCase(input)
         toast.success('Caso de soporte creado exitosamente')
       } else {
         if (!selectedCase) return
@@ -1006,6 +1635,25 @@ export function CasesMaintenancePage() {
       refetch()
     } catch (err: any) {
       toast.error(friendlyError(err, 'Error al eliminar el caso'))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    setIsDeleting(true)
+    try {
+      await Promise.all(selectedIds.map((uuid) => removeCase(uuid)))
+      toast.success(`${selectedIds.length} casos eliminados`)
+      setBulkDeleteDialogOpen(false)
+      setRowSelectionModel(createEmptyGridSelectionModel())
+      if (drawerCaseId && selectedIds.includes(drawerCaseId)) {
+        setDrawerCaseId(null)
+      }
+      refetch()
+    } catch (err: any) {
+      toast.error(friendlyError(err, 'Error al eliminar los casos seleccionados'))
     } finally {
       setIsDeleting(false)
     }
@@ -1036,28 +1684,47 @@ export function CasesMaintenancePage() {
     {
       field: 'tags',
       headerName: 'Etiquetas',
-      width: 200,
+      flex: 0.75,
+      minWidth: 220,
       sortable: false,
       renderCell: (params) => {
         const tags: { uuid: string; name: string; color: string }[] = params.row.tags ?? []
         if (!tags.length) return <span style={{ color: 'var(--mui-palette-text-disabled)' }}>—</span>
+        const visibleTags = tags.slice(0, 2)
+        const hiddenCount = tags.length - visibleTags.length
         return (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4, alignItems: 'center', py: 0.5 }}>
-            {tags.map((tag) => (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.55, alignItems: 'center', py: 0.5, minWidth: 0, maxWidth: '100%' }}>
+            {visibleTags.map((tag) => (
               <Chip
                 key={tag.uuid}
                 size="small"
                 label={tag.name}
                 sx={{
-                  height: 20,
+                  height: 22,
+                  maxWidth: 130,
                   fontSize: '0.68rem',
-                  fontWeight: 700,
+                  fontWeight: 800,
                   bgcolor: `${tag.color}28`,
                   color: tag.color,
                   border: `1px solid ${tag.color}55`,
                 }}
               />
             ))}
+            {hiddenCount > 0 && (
+              <Chip
+                size="small"
+                label={`+${hiddenCount}`}
+                sx={{
+                  height: 22,
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                  bgcolor: 'action.selected',
+                  color: 'text.secondary',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              />
+            )}
           </Box>
         )
       },
@@ -1140,12 +1807,6 @@ export function CasesMaintenancePage() {
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Casos" description="Reclamos, renovaciones, endosos y seguimiento operativo." actionLabel="" icon={ClipboardCheck} />
         </Box>
-        {canCreateCase && (
-          <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
-            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-            Nuevo caso
-          </Button>
-        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de casos.</Alert>}
@@ -1155,6 +1816,9 @@ export function CasesMaintenancePage() {
         columns={columns}
         getRowId={(row) => row.uuid}
         loading={loading}
+        checkboxSelection={canDeleteCase}
+        rowSelectionModel={rowSelectionModel}
+        onRowSelectionModelChange={setRowSelectionModel}
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
         onRowClick={(params) => setDrawerCaseId(params.row.uuid)}
@@ -1196,7 +1860,7 @@ export function CasesMaintenancePage() {
           <DialogContent dividers sx={{ borderColor: 'divider' }}>
             <Stack spacing={3} sx={{ mt: 1 }}>
               <Controller name="title" control={control} render={({ field }) => (
-                <TextField {...field} value={field.value ?? ''} label="Título del Caso *" fullWidth error={!!errors.title} helperText={errors.title?.message?.toString() ?? ' '} />
+                <TextField {...field} type="text" value={field.value ?? ''} label="Título del Caso *" fullWidth error={!!errors.title} helperText={errors.title?.message?.toString() ?? ' '} />
               )} />
 
               <Controller name="description" control={control} render={({ field }) => (
@@ -1261,6 +1925,8 @@ export function CasesMaintenancePage() {
               <Stack direction="row" spacing={2}>
                 <Controller name="clientId" control={control} render={({ field }) => (
                   <Autocomplete
+                    disablePortal
+                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
                     options={clientOptions}
                     getOptionLabel={(option: ClientRaw) => option.displayName}
                     value={clientOptions.find((c) => c.uuid === field.value) ?? null}
@@ -1269,12 +1935,14 @@ export function CasesMaintenancePage() {
                     noOptionsText="Sin resultados"
                     fullWidth
                     renderInput={(params) => (
-                      <TextField {...params} label="Cliente *" error={!!errors.clientId} helperText={errors.clientId?.message?.toString() ?? ' '} />
+                      <TextField {...params} type="text" label="Cliente *" error={!!errors.clientId} helperText={errors.clientId?.message?.toString() ?? ' '} />
                     )}
                   />
                 )} />
                 <Controller name="policyId" control={control} render={({ field }) => (
                   <Autocomplete
+                    disablePortal
+                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
                     options={policyOptions}
                     getOptionLabel={(option: PolicyRaw) => option.policyNumber}
                     value={policyOptions.find((p) => p.uuid === field.value) ?? null}
@@ -1289,6 +1957,7 @@ export function CasesMaintenancePage() {
                       return (
                         <TextField
                           {...restParams}
+                          type="text"
                           label="Póliza Asociada"
                           error={!!errors.policyId}
                           helperText={errors.policyId?.message?.toString() ?? ' '}
@@ -1313,6 +1982,8 @@ export function CasesMaintenancePage() {
 
               <Controller name="assignedUserId" control={control} render={({ field }) => (
                 <Autocomplete
+                  disablePortal
+                  slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
                   options={userOptions}
                   getOptionLabel={(option: UserRaw) => `${option.firstName} ${option.lastName} (${option.email})`}
                   value={userOptions.find((u) => u.uuid === field.value) ?? null}
@@ -1321,7 +1992,7 @@ export function CasesMaintenancePage() {
                   noOptionsText="Sin resultados"
                   fullWidth
                   renderInput={(params) => (
-                    <TextField {...params} label="Responsable Asignado" error={!!errors.assignedUserId} helperText={errors.assignedUserId?.message?.toString() ?? ' '} />
+                    <TextField {...params} type="text" label="Responsable Asignado" error={!!errors.assignedUserId} helperText={errors.assignedUserId?.message?.toString() ?? ' '} />
                   )}
                   renderOption={(props: React.HTMLAttributes<HTMLLIElement> & { key: React.Key }, option: UserRaw) => {
                     const { key, ...optionProps } = props;
@@ -1350,6 +2021,8 @@ export function CasesMaintenancePage() {
               <Controller name="tagUuids" control={control} render={({ field }) => (
                 <Autocomplete
                   multiple
+                  disablePortal
+                  slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
                   options={tags ?? []}
                   getOptionLabel={(option: TagRaw) => option.name}
                   value={(tags ?? []).filter((t) => (field.value ?? []).includes(t.uuid))}
@@ -1360,7 +2033,7 @@ export function CasesMaintenancePage() {
                   noOptionsText="Sin resultados"
                   fullWidth
                   renderInput={(params) => (
-                    <TextField {...params} label="Etiquetas" error={!!errors.tagUuids} helperText={errors.tagUuids?.message ?? ' '} />
+                    <TextField {...params} type="text" label="Etiquetas" error={!!errors.tagUuids} helperText={errors.tagUuids?.message ?? ' '} />
                   )}
                   renderValue={(tagValue: TagRaw[], getItemProps: any) =>
                     tagValue.map((option: TagRaw, index: number) => {
@@ -1426,6 +2099,38 @@ export function CasesMaintenancePage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={bulkDeleteDialogOpen} onClose={() => !isDeleting && setBulkDeleteDialogOpen(false)} slotProps={{ paper: { sx: { borderRadius: 3, maxWidth: 420 } } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Trash2 size={20} color="var(--mui-palette-error-main)" /> Eliminar casos
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'text.primary', mt: 1 }}>
+            ¿Eliminar <strong>{selectedCount}</strong> casos seleccionados? Esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button onClick={() => setBulkDeleteDialogOpen(false)} disabled={isDeleting} sx={{ color: 'text.secondary' }}>Cancelar</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={isDeleting}
+            onClick={handleBulkDelete}
+            startIcon={isDeleting ? <CircularProgress size={16} color="inherit" /> : <Trash2 size={16} />}
+          >
+            {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {(canCreateCase || (canDeleteCase && selectedCount > 0)) && (
+        <MaintenanceFab
+          label={selectedCount > 0 ? `Eliminar ${selectedCount} casos` : 'Nuevo caso'}
+          onClick={selectedCount > 0 ? () => setBulkDeleteDialogOpen(true) : openCreate}
+          icon={selectedCount > 0 ? <Trash2 size={24} /> : undefined}
+          color={selectedCount > 0 ? 'error' : 'primary'}
+        />
+      )}
     </Stack>
   )
 }

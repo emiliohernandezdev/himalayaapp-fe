@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, Tab, Tabs, TextField, Typography } from '@mui/material'
-import type { GridColDef } from '@mui/x-data-grid'
-import { Edit2, FileText, MoreVertical, Plus, Trash2 } from 'lucide-react'
+import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, Tab, Tabs, TextField, Tooltip, Typography, useTheme } from '@mui/material'
+import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
+import { Edit2, FileText, MoreVertical, Trash2, CreditCard, ArrowRightLeft, Banknote } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -16,6 +16,8 @@ import { ResponsiveDataGrid } from '../../components/ResponsiveDataGrid'
 import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { esESGrid, policyStatusLabels, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
+import { MaintenanceFab } from '../../components/MaintenanceFab'
+import { createEmptyGridSelectionModel, getSelectedGridIds } from '../../utils/gridSelection'
 
 const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((val) => (val === '' || val == null ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
@@ -32,9 +34,161 @@ const policySchema = z.object({
   providerUuid: z.string().min(1, 'Selecciona un proveedor'),
   productUuid: z.string().min(1, 'Selecciona un producto'),
   notes: emptyToUndefined(z.string().optional()),
+  paymentMethod: emptyToUndefined(z.enum(['card', 'transfer', 'cash']).optional()),
+  cardBrand: emptyToUndefined(z.enum(['visa', 'mastercard', 'amex', 'other']).optional()),
+  cardLastFour: emptyToUndefined(z.string().optional()),
+  billingFrequency: emptyToUndefined(z.enum(['single', 'monthly', 'quarterly', 'semi_annually', 'annually']).optional()),
+  billingInstallments: emptyToUndefined(z.coerce.number().int().min(1, 'Debe ser al menos 1 cuota').optional()),
+  installmentAmount: emptyToUndefined(z.coerce.number().min(0, 'Debe ser mayor o igual a 0').optional()),
+}).refine((data) => {
+  if (data.paymentMethod === 'card') {
+    return !!data.cardBrand
+  }
+  return true
+}, {
+  message: 'Selecciona una franquicia',
+  path: ['cardBrand'],
+}).refine((data) => {
+  if (data.paymentMethod === 'card') {
+    return /^\d{4}$/.test(data.cardLastFour ?? '')
+  }
+  return true
+}, {
+  message: 'Debe tener 4 dígitos',
+  path: ['cardLastFour'],
 })
 
 type PolicyFormData = z.infer<typeof policySchema>
+
+function PaymentMethodBadge({
+  method,
+  brand,
+  lastFour,
+}: {
+  method?: string | null
+  brand?: string | null
+  lastFour?: string | null
+}) {
+  const theme = useTheme()
+  if (!method) return <Typography variant="body2" color="text.secondary">—</Typography>
+
+  let tooltipTitle = ''
+  let content: React.ReactElement
+
+  if (method === 'card') {
+    const brandName = brand ? (brand.toLowerCase() === 'amex' ? 'AMEX' : brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase()) : 'Tarjeta'
+    tooltipTitle = `Tarjeta de Crédito / Débito: ${brandName}${lastFour ? ` (•••• ${lastFour})` : ''}`
+
+    const getBrandIcon = () => {
+      if (!brand) return <CreditCard size={14} />
+      const b = brand.toLowerCase()
+      if (b === 'visa') {
+        return <img src="/cards/visa.svg" alt="Visa" style={{ height: 18, width: 'auto', display: 'inline-block', verticalAlign: 'middle', filter: theme.palette.mode === 'dark' ? 'brightness(0) invert(1)' : 'none' }} />
+      }
+      if (b === 'mastercard') {
+        return <img src="/cards/mastercard.svg" alt="Mastercard" style={{ height: 22, width: 'auto', display: 'inline-block', verticalAlign: 'middle' }} />
+      }
+      if (b === 'amex') {
+        return <img src="/cards/amex.svg" alt="American Express" style={{ height: 18, width: 'auto', display: 'inline-block', verticalAlign: 'middle' }} />
+      }
+      return <CreditCard size={14} />
+    }
+
+    content = (
+      <Box sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 1.5,
+        bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+        border: '1px solid',
+        borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+        px: 1.5,
+        py: 0.5,
+        borderRadius: 2,
+        height: 28,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {getBrandIcon()}
+        </Box>
+        {lastFour && (
+          <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600, color: 'text.primary', fontSize: '0.85rem' }}>
+            •••• {lastFour}
+          </Typography>
+        )}
+      </Box>
+    )
+  } else {
+    tooltipTitle = method === 'transfer' ? 'Transferencia Bancaria' : 'Pago en Efectivo'
+    
+    const getMethodIcon = () => {
+      switch (method) {
+        case 'transfer':
+          return <ArrowRightLeft size={14} />
+        case 'cash':
+          return <Banknote size={14} />
+        default:
+          return null
+      }
+    }
+
+    const getMethodLabel = () => {
+      switch (method) {
+        case 'transfer':
+          return 'Transferencia'
+        case 'cash':
+          return 'Efectivo'
+        default:
+          return method
+      }
+    }
+
+    const getBadgeColors = () => {
+      if (method === 'transfer') {
+        return {
+          bg: theme.palette.mode === 'dark' ? 'rgba(14, 165, 233, 0.1)' : 'rgba(14, 165, 233, 0.08)',
+          border: theme.palette.mode === 'dark' ? 'rgba(14, 165, 233, 0.2)' : 'rgba(14, 165, 233, 0.15)',
+          text: theme.palette.mode === 'dark' ? '#38bdf8' : '#0369a1',
+        }
+      }
+      return {
+        bg: theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.08)',
+        border: theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.15)',
+        text: theme.palette.mode === 'dark' ? '#4ade80' : '#15803d',
+      }
+    }
+
+    const colors = getBadgeColors()
+
+    content = (
+      <Box sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 1,
+        bgcolor: colors.bg,
+        border: '1px solid',
+        borderColor: colors.border,
+        px: 1.5,
+        py: 0.5,
+        borderRadius: 2,
+        height: 28,
+        color: colors.text,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {getMethodIcon()}
+        </Box>
+        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>
+          {getMethodLabel()}
+        </Typography>
+      </Box>
+    )
+  }
+
+  return (
+    <Tooltip title={tooltipTitle} arrow enterDelay={300}>
+      {content}
+    </Tooltip>
+  )
+}
 
 export function PoliciesMaintenancePage() {
   const { data: policies, error, loading, refetch } = useApiQuery('policies', fetchPolicies)
@@ -46,6 +200,7 @@ export function PoliciesMaintenancePage() {
   const permissionsLoading = usePermissionLoading()
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
+  const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>(() => createEmptyGridSelectionModel())
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [selected, setSelected] = useState<PolicyRaw | null>(null)
 
@@ -93,7 +248,13 @@ export function PoliciesMaintenancePage() {
   }, [policies, activeTab])
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const selectedIds = useMemo(
+    () => getSelectedGridIds(rowSelectionModel, (policies ?? []).map((policy) => policy.uuid)),
+    [policies, rowSelectionModel],
+  )
+  const selectedCount = selectedIds.length
 
   const { control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<PolicyFormData>({
     resolver: zodResolver(policySchema),
@@ -109,6 +270,12 @@ export function PoliciesMaintenancePage() {
       providerUuid: '',
       productUuid: '',
       notes: '',
+      paymentMethod: '',
+      cardBrand: '',
+      cardLastFour: '',
+      billingFrequency: '',
+      billingInstallments: undefined,
+      installmentAmount: undefined,
     },
   })
 
@@ -126,6 +293,12 @@ export function PoliciesMaintenancePage() {
       providerUuid: '',
       productUuid: '',
       notes: '',
+      paymentMethod: '',
+      cardBrand: '',
+      cardLastFour: '',
+      billingFrequency: '',
+      billingInstallments: undefined,
+      installmentAmount: undefined,
     })
     setDialogOpen(true)
   }
@@ -157,6 +330,12 @@ export function PoliciesMaintenancePage() {
       providerUuid: selected.provider?.uuid ?? '',
       productUuid: selected.product?.uuid ?? '',
       notes: selected.notes ?? '',
+      paymentMethod: selected.paymentMethod ?? '',
+      cardBrand: selected.cardBrand ?? '',
+      cardLastFour: selected.cardLastFour ?? '',
+      billingFrequency: selected.billingFrequency ?? '',
+      billingInstallments: selected.billingInstallments ? Number(selected.billingInstallments) : undefined,
+      installmentAmount: selected.installmentAmount ? Number(selected.installmentAmount) : undefined,
     })
     setDialogOpen(true)
   }
@@ -193,6 +372,22 @@ export function PoliciesMaintenancePage() {
       refetch()
     } catch (err: any) {
       toast.error(err.message || 'Error al eliminar la póliza')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    setIsDeleting(true)
+    try {
+      await Promise.all(selectedIds.map((uuid) => removePolicy(uuid)))
+      toast.success(`${selectedIds.length} pólizas eliminadas`)
+      setBulkDeleteDialogOpen(false)
+      setRowSelectionModel(createEmptyGridSelectionModel())
+      refetch()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar las pólizas seleccionadas')
     } finally {
       setIsDeleting(false)
     }
@@ -259,6 +454,18 @@ export function PoliciesMaintenancePage() {
       }
     },
     {
+      field: 'paymentMethod',
+      headerName: 'Método de Pago',
+      width: 200,
+      renderCell: (params) => (
+        <PaymentMethodBadge
+          method={params.row.paymentMethod}
+          brand={params.row.cardBrand}
+          lastFour={params.row.cardLastFour}
+        />
+      ),
+    },
+    {
       field: 'status', headerName: 'Estado', width: 170, type: 'singleSelect',
       valueOptions: Object.entries(policyStatusLabels).map(([value, label]) => ({ value, label })),
       renderCell: (params) => {
@@ -278,6 +485,8 @@ export function PoliciesMaintenancePage() {
 
   const selectedProviderUuid = watch('providerUuid')
   const selectedProductUuid = watch('productUuid')
+  const watchedPaymentMethod = watch('paymentMethod')
+  const watchedBillingFrequency = watch('billingFrequency')
 
   const productOptions = useMemo(
     () => (products ?? []).filter((product) => !selectedProviderUuid || product.providerUuid === selectedProviderUuid),
@@ -310,12 +519,6 @@ export function PoliciesMaintenancePage() {
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Pólizas" description="Contratos, vigencias, documentos y renovaciones." actionLabel="" icon={FileText} />
         </Box>
-        {canManagePolicies && (
-          <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
-            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-            Nueva póliza
-          </Button>
-        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de pólizas.</Alert>}
@@ -350,6 +553,9 @@ export function PoliciesMaintenancePage() {
         columns={columns}
         getRowId={(row) => row.uuid}
         loading={loading}
+        checkboxSelection={canManagePolicies}
+        rowSelectionModel={rowSelectionModel}
+        onRowSelectionModelChange={setRowSelectionModel}
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
         localeText={esESGrid}
@@ -374,9 +580,9 @@ export function PoliciesMaintenancePage() {
           </DialogTitle>
           <DialogContent dividers sx={{ borderColor: 'divider' }}>
             <Stack spacing={3} sx={{ mt: 1 }}>
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Controller name="policyNumber" control={control} render={({ field }) => (
-                  <TextField {...field} label="Número de Póliza *" fullWidth error={!!errors.policyNumber} helperText={errors.policyNumber?.message ?? ' '} />
+                  <TextField {...field} type="text" label="Número de Póliza *" fullWidth error={!!errors.policyNumber} helperText={errors.policyNumber?.message ?? ' '} />
                 )} />
                 <Controller name="status" control={control} render={({ field }) => (
                   <TextField {...field} select label="Estado *" fullWidth error={!!errors.status} helperText={errors.status?.message ?? ' '}>
@@ -389,9 +595,11 @@ export function PoliciesMaintenancePage() {
                 )} />
               </Stack>
 
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Controller name="clientUuid" control={control} render={({ field }) => (
                   <Autocomplete
+                    disablePortal
+                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
                     options={clients ?? []}
                     getOptionLabel={(option: ClientRaw) => option.displayName}
                     value={(clients ?? []).find((client) => client.uuid === field.value) ?? null}
@@ -400,12 +608,14 @@ export function PoliciesMaintenancePage() {
                     noOptionsText="Sin resultados"
                     fullWidth
                     renderInput={(params) => (
-                      <TextField {...params} label="Cliente *" error={!!errors.clientUuid} helperText={errors.clientUuid?.message ?? ' '} />
+                      <TextField {...params} type="text" label="Cliente *" error={!!errors.clientUuid} helperText={errors.clientUuid?.message ?? ' '} />
                     )}
                   />
                 )} />
                 <Controller name="providerUuid" control={control} render={({ field }) => (
                   <Autocomplete
+                    disablePortal
+                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
                     options={providers ?? []}
                     getOptionLabel={(option: ProviderRaw) => option.name}
                     value={(providers ?? []).find((provider) => provider.uuid === field.value) ?? null}
@@ -417,15 +627,17 @@ export function PoliciesMaintenancePage() {
                     noOptionsText="Sin resultados"
                     fullWidth
                     renderInput={(params) => (
-                      <TextField {...params} label="Proveedor *" error={!!errors.providerUuid} helperText={errors.providerUuid?.message ?? ' '} />
+                      <TextField {...params} type="text" label="Proveedor *" error={!!errors.providerUuid} helperText={errors.providerUuid?.message ?? ' '} />
                     )}
                   />
                 )} />
               </Stack>
 
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Controller name="productUuid" control={control} render={({ field }) => (
                   <Autocomplete
+                    disablePortal
+                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
                     options={productOptions}
                     getOptionLabel={(option: ProductRaw) => option.name}
                     value={productOptions.find((product) => product.uuid === field.value) ?? null}
@@ -435,7 +647,7 @@ export function PoliciesMaintenancePage() {
                     disabled={!selectedProviderUuid}
                     fullWidth
                     renderInput={(params) => (
-                      <TextField {...params} label="Producto *" error={!!errors.productUuid} helperText={errors.productUuid?.message ?? ' '} />
+                      <TextField {...params} type="text" label="Producto *" error={!!errors.productUuid} helperText={errors.productUuid?.message ?? ' '} />
                     )}
                   />
                 )} />
@@ -447,7 +659,7 @@ export function PoliciesMaintenancePage() {
                 )} />
               </Stack>
 
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Controller
                   name="startDate"
                   control={control}
@@ -492,14 +704,204 @@ export function PoliciesMaintenancePage() {
                 />
               </Stack>
 
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Controller name="insuredAmount" control={control} render={({ field }) => (
                   <TextField {...field} value={field.value ?? ''} type="number" label="Suma Asegurada" fullWidth error={!!errors.insuredAmount} helperText={(errors.insuredAmount as any)?.message ?? ' '} />
                 )} />
                 <Controller name="premiumAmount" control={control} render={({ field }) => (
-                  <TextField {...field} value={field.value ?? ''} type="number" label="Prima Anual" fullWidth error={!!errors.premiumAmount} helperText={(errors.premiumAmount as any)?.message ?? ' '} />
+                  <TextField
+                    {...field}
+                    value={field.value ?? ''}
+                    type="number"
+                    label="Prima Anual"
+                    fullWidth
+                    error={!!errors.premiumAmount}
+                    helperText={(errors.premiumAmount as any)?.message ?? ' '}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : ''
+                      field.onChange(val)
+                      // Recalculate installment amount on premium amount change
+                      const freq = watch('billingFrequency')
+                      const insts = watch('billingInstallments')
+                      if (val && freq && freq !== 'single' && insts) {
+                        setValue('installmentAmount', Number((Number(val) / Number(insts)).toFixed(2)))
+                      }
+                    }}
+                  />
                 )} />
               </Stack>
+
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <Controller name="billingFrequency" control={control} render={({ field }) => (
+                  <TextField
+                    {...field}
+                    select
+                    label="Periodicidad de Cobro"
+                    fullWidth
+                    error={!!errors.billingFrequency}
+                    helperText={errors.billingFrequency?.message?.toString() ?? ' '}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      field.onChange(val)
+                      // Auto-populate default installments based on frequency
+                      if (val === 'single') {
+                        setValue('billingInstallments', 1)
+                        setValue('installmentAmount', watch('premiumAmount') ? Number(watch('premiumAmount')) : undefined)
+                      } else if (val === 'monthly') {
+                        setValue('billingInstallments', 12)
+                      } else if (val === 'quarterly') {
+                        setValue('billingInstallments', 4)
+                      } else if (val === 'semi_annually') {
+                        setValue('billingInstallments', 2)
+                      } else if (val === 'annually') {
+                        setValue('billingInstallments', 1)
+                      } else {
+                        setValue('billingInstallments', undefined)
+                        setValue('installmentAmount', undefined)
+                      }
+                      
+                      // Auto-calculate suggested installment amount
+                      const premium = watch('premiumAmount')
+                      if (premium && val && val !== 'single') {
+                        let insts = 1
+                        if (val === 'monthly') insts = 12
+                        else if (val === 'quarterly') insts = 4
+                        else if (val === 'semi_annually') insts = 2
+                        setValue('installmentAmount', Number((Number(premium) / insts).toFixed(2)))
+                      }
+                    }}
+                  >
+                    <MenuItem value="">Ninguna</MenuItem>
+                    <MenuItem value="single">Pago Único</MenuItem>
+                    <MenuItem value="monthly">Mensual</MenuItem>
+                    <MenuItem value="quarterly">Trimestral</MenuItem>
+                    <MenuItem value="semi_annually">Semestral</MenuItem>
+                    <MenuItem value="annually">Anual</MenuItem>
+                  </TextField>
+                )} />
+              </Stack>
+
+              {watchedBillingFrequency && watchedBillingFrequency !== 'single' && (
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <Controller name="billingInstallments" control={control} render={({ field }) => (
+                    <TextField
+                      {...field}
+                      value={field.value ?? ''}
+                      type="number"
+                      label="Número de Cuotas *"
+                      fullWidth
+                      error={!!errors.billingInstallments}
+                      helperText={errors.billingInstallments?.message?.toString() ?? ' '}
+                      onChange={(e) => {
+                        const val = e.target.value ? Number(e.target.value) : undefined
+                        field.onChange(val)
+                        const premium = watch('premiumAmount')
+                        if (premium && val) {
+                          setValue('installmentAmount', Number((Number(premium) / val).toFixed(2)))
+                        }
+                      }}
+                    />
+                  )} />
+                  <Controller name="installmentAmount" control={control} render={({ field }) => (
+                    <TextField
+                      {...field}
+                      value={field.value ?? ''}
+                      type="number"
+                      label="Monto por Cuota *"
+                      fullWidth
+                      error={!!errors.installmentAmount}
+                      helperText={errors.installmentAmount?.message?.toString() ?? ' '}
+                    />
+                  )} />
+                </Stack>
+              )}
+
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <Controller name="paymentMethod" control={control} render={({ field }) => (
+                  <TextField
+                    {...field}
+                    select
+                    label="Método de Pago"
+                    fullWidth
+                    error={!!errors.paymentMethod}
+                    helperText={errors.paymentMethod?.message?.toString() ?? ' '}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      field.onChange(val)
+                      if (val !== 'card') {
+                        setValue('cardBrand', '')
+                        setValue('cardLastFour', '')
+                      }
+                    }}
+                  >
+                    <MenuItem value="">Ninguno</MenuItem>
+                    <MenuItem value="card">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <CreditCard size={18} style={{ opacity: 0.8 }} />
+                        <span>Tarjeta de Crédito/Débito</span>
+                      </Box>
+                    </MenuItem>
+                    <MenuItem value="transfer">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <ArrowRightLeft size={18} style={{ opacity: 0.8 }} />
+                        <span>Transferencia Bancaria</span>
+                      </Box>
+                    </MenuItem>
+                    <MenuItem value="cash">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Banknote size={18} style={{ opacity: 0.8 }} />
+                        <span>Efectivo</span>
+                      </Box>
+                    </MenuItem>
+                  </TextField>
+                )} />
+              </Stack>
+
+              {watchedPaymentMethod === 'card' && (
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <Controller name="cardBrand" control={control} render={({ field }) => (
+                    <TextField {...field} select label="Franquicia *" fullWidth error={!!errors.cardBrand} helperText={errors.cardBrand?.message?.toString() ?? ' '}>
+                      <MenuItem value="">Selecciona...</MenuItem>
+                      <MenuItem value="visa">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <img src="/cards/visa.svg" alt="Visa" style={{ height: 16, width: 'auto' }} />
+                          <span>Visa</span>
+                        </Box>
+                      </MenuItem>
+                      <MenuItem value="mastercard">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <img src="/cards/mastercard.svg" alt="Mastercard" style={{ height: 22, width: 'auto' }} />
+                          <span>Mastercard</span>
+                        </Box>
+                      </MenuItem>
+                      <MenuItem value="amex">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <img src="/cards/amex.svg" alt="American Express" style={{ height: 16, width: 'auto' }} />
+                          <span>American Express (AMEX)</span>
+                        </Box>
+                      </MenuItem>
+                      <MenuItem value="other">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <CreditCard size={16} />
+                          <span>Otra</span>
+                        </Box>
+                      </MenuItem>
+                    </TextField>
+                  )} />
+                  <Controller name="cardLastFour" control={control} render={({ field }) => (
+                    <TextField
+                      {...field}
+                      type="text"
+                      label="Últimos 4 dígitos *"
+                      fullWidth
+                      placeholder="1234"
+                      slotProps={{ htmlInput: { maxLength: 4 } }}
+                      error={!!errors.cardLastFour}
+                      helperText={errors.cardLastFour?.message?.toString() ?? ' '}
+                    />
+                  )} />
+                </Stack>
+              )}
 
               <Controller name="notes" control={control} render={({ field }) => (
                 <TextField {...field} value={field.value ?? ''} label="Notas / Observaciones" multiline rows={3} fullWidth error={!!errors.notes} helperText={(errors.notes as any)?.message ?? ' '} />
@@ -541,6 +943,38 @@ export function PoliciesMaintenancePage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={bulkDeleteDialogOpen} onClose={() => !isDeleting && setBulkDeleteDialogOpen(false)} slotProps={{ paper: { sx: { borderRadius: 3, maxWidth: 420 } } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Trash2 size={20} color="var(--mui-palette-error-main)" /> Eliminar pólizas
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'text.primary', mt: 1 }}>
+            ¿Eliminar <strong>{selectedCount}</strong> pólizas seleccionadas? Esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button onClick={() => setBulkDeleteDialogOpen(false)} disabled={isDeleting} sx={{ color: 'text.secondary' }}>Cancelar</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={isDeleting}
+            onClick={handleBulkDelete}
+            startIcon={isDeleting ? <CircularProgress size={16} color="inherit" /> : <Trash2 size={16} />}
+          >
+            {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {canManagePolicies && (
+        <MaintenanceFab
+          label={selectedCount > 0 ? `Eliminar ${selectedCount} pólizas` : 'Nueva póliza'}
+          onClick={selectedCount > 0 ? () => setBulkDeleteDialogOpen(true) : openCreate}
+          icon={selectedCount > 0 ? <Trash2 size={24} /> : undefined}
+          color={selectedCount > 0 ? 'error' : 'primary'}
+        />
+      )}
     </Stack>
   )
 }

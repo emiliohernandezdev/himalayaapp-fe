@@ -101,7 +101,7 @@ export function LoginPage({ mode }: LoginPageProps) {
           {/* Logo and Header */}
           <Stack spacing={5} className="relative z-10">
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-              <HimalayaLogo className="h-12 w-16 shrink-0 filter brightness-0 invert" />
+              <HimalayaLogo className="h-12 w-16 shrink-0 text-sky-100" />
               <Box>
                 <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' }, fontWeight: 800, letterSpacing: '0.05em', color: '#f0f9ff' }}>
                   Himalaya

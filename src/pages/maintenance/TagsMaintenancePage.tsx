@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Pagination, Stack, TextField, Typography } from '@mui/material'
-import { Edit2, MoreVertical, Plus, Tags, Trash2 } from 'lucide-react'
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Pagination, Stack, TextField, Typography } from '@mui/material'
+import { Edit2, MoreVertical, Tags, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -11,6 +11,7 @@ import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
 import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
+import { MaintenanceFab } from '../../components/MaintenanceFab'
 
 const colorPresets = [
   '#075985',
@@ -127,12 +128,6 @@ export function TagsMaintenancePage() {
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Etiquetas" description="Clasificación visual para casos y seguimiento." actionLabel="" icon={Tags} />
         </Box>
-        {canManageTags && (
-          <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
-            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-            Nueva etiqueta
-          </Button>
-        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar las etiquetas.</Alert>}
@@ -148,24 +143,67 @@ export function TagsMaintenancePage() {
       <Box className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {loading
           ? Array.from({ length: 8 }).map((_, i) => (
-              <Box key={i} sx={{ height: 100, borderRadius: 3, bgcolor: 'background.paper', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+              <Box key={i} sx={{ height: 100, borderRadius: 3, bgcolor: 'var(--himalaya-surface-soft)', border: '1px solid', borderColor: 'divider', animation: 'himalaya-skeleton-pulse 1.8s ease-in-out infinite' }} />
             ))
           : paginated.map((tag) => (
               <Box key={tag.uuid} sx={{
-                bgcolor: 'background.paper', borderRadius: 3, border: '1px solid', borderColor: 'divider', p: 2.5,
-                display: 'flex', alignItems: 'center', gap: 2,
-                transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', borderColor: 'primary.main' }
+                position: 'relative',
+                overflow: 'hidden',
+                minHeight: 150,
+                bgcolor: 'background.paper',
+                borderRadius: 4,
+                border: '1px solid',
+                borderColor: 'divider',
+                p: 2.5,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: 2,
+                boxShadow: 'var(--himalaya-shadow)',
+                transition: 'transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: 0,
+                  background: `radial-gradient(circle at 12% 0%, ${tag.color}30, transparent 42%)`,
+                  pointerEvents: 'none',
+                },
+                '&:hover': {
+                  transform: 'translateY(-3px)',
+                  borderColor: tag.color,
+                  boxShadow: `0 18px 38px ${tag.color}24`,
+                },
               }}>
-                <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: tag.color, flexShrink: 0 }} />
-                <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }} noWrap>{tag.name}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>{tag.description || tag.color}</Typography>
+                <Stack direction="row" spacing={1.5} sx={{ position: 'relative', zIndex: 1, alignItems: 'flex-start' }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: 3, bgcolor: tag.color, flexShrink: 0, boxShadow: `0 14px 28px ${tag.color}38`, border: '1px solid rgba(255,255,255,0.28)' }} />
+                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 900, color: 'text.primary', lineHeight: 1.15 }} noWrap>{tag.name}</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.45, display: '-webkit-box', overflow: 'hidden', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.35 }}>
+                      {tag.description || 'Sin descripcion registrada.'}
+                    </Typography>
+                  </Box>
+                  {canManageTags && (
+                    <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelected(tag) }} sx={{ color: 'text.secondary', flexShrink: 0, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                      <MoreVertical size={16} />
+                    </IconButton>
+                  )}
+                </Stack>
+                <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                  <Chip
+                    size="small"
+                    label={tag.name}
+                    sx={{
+                      maxWidth: '70%',
+                      bgcolor: `${tag.color}24`,
+                      color: tag.color,
+                      border: `1px solid ${tag.color}55`,
+                      fontWeight: 900,
+                    }}
+                  />
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, fontFamily: 'monospace' }}>
+                    {tag.color.toUpperCase()}
+                  </Typography>
                 </Box>
-                {canManageTags && (
-                  <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelected(tag) }} sx={{ color: 'text.secondary', flexShrink: 0 }}>
-                    <MoreVertical size={16} />
-                  </IconButton>
-                )}
               </Box>
             ))}
       </Box>
@@ -287,6 +325,10 @@ export function TagsMaintenancePage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {canManageTags && (
+        <MaintenanceFab label="Nueva etiqueta" onClick={openCreate} />
+      )}
     </Stack>
   )
 }

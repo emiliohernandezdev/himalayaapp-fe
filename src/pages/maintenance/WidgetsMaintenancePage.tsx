@@ -22,7 +22,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { Edit2, MoreVertical, Plus, Blocks, Trash2 } from 'lucide-react'
+import { Edit2, MoreVertical, Blocks, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -33,6 +33,7 @@ import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
 import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
+import { MaintenanceFab } from '../../components/MaintenanceFab'
 import { WidgetIconPreview } from '../../components/WidgetIconPreview'
 
 const categories = ['Métricas', 'Operación', 'Análisis', 'Seguridad']
@@ -223,22 +224,6 @@ export function WidgetsMaintenancePage() {
             icon={Blocks}
           />
         </Box>
-        {canManageWidgets && (
-          <Button
-            variant="contained"
-            startIcon={<Plus size={20} />}
-            onClick={openCreate}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 700,
-              px: 3,
-              boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)',
-            }}
-          >
-            Nuevo Widget
-          </Button>
-        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la lista de widgets.</Alert>}
@@ -259,8 +244,10 @@ export function WidgetsMaintenancePage() {
                 sx={{
                   height: 280,
                   borderRadius: 4,
-                  bgcolor: 'background.paper',
-                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                  bgcolor: 'var(--himalaya-surface-soft)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  animation: 'himalaya-skeleton-pulse 1.8s ease-in-out infinite',
                 }}
               />
             ))
@@ -572,6 +559,10 @@ export function WidgetsMaintenancePage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {canManageWidgets && (
+        <MaintenanceFab label="Nuevo widget" onClick={openCreate} />
+      )}
     </Stack>
   )
 }

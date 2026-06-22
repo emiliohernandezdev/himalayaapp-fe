@@ -1,11 +1,12 @@
 import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material'
-import { Edit2, MoreVertical, Plus, Trash2 } from 'lucide-react'
+import { Edit2, MoreVertical, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import type { MaintenanceRecord } from '../../api/maintenanceApi'
 import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
+import { MaintenanceFab } from '../../components/MaintenanceFab'
 
 type MaintenanceRecordsViewProps = {
   title: string
@@ -79,25 +80,6 @@ export function MaintenanceRecordsView({
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title={title} description={description} actionLabel="" icon={Icon} />
         </Box>
-        <Button 
-          variant="contained" 
-          startIcon={<Plus size={20} />} 
-          onClick={handleOpenCreate}
-          sx={{
-            borderRadius: '9999px',
-            textTransform: 'none',
-            fontWeight: 600,
-            paddingX: 3,
-            boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)',
-            '&:hover': {
-              boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
-              transform: 'translateY(-1px)'
-            },
-            transition: 'all 0.2s ease-in-out'
-          }}
-        >
-          {actionLabel}
-        </Button>
       </Stack>
 
       {error ? (
@@ -256,8 +238,8 @@ export function MaintenanceRecordsView({
       </Menu>
 
       {/* Create / Edit Dialog (Placeholder form) */}
-      <Dialog 
-        open={dialogOpen} 
+      <Dialog
+        open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         maxWidth="sm"
         fullWidth
@@ -289,6 +271,8 @@ export function MaintenanceRecordsView({
           </Button>
         </DialogActions>
       </Dialog>
+
+      <MaintenanceFab label={actionLabel} onClick={handleOpenCreate} />
 
       {/* Delete Confirmation Dialog */}
       <Dialog 

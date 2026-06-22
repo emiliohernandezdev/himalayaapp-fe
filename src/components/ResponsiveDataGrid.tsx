@@ -1,7 +1,7 @@
-import { Box, Stack, TablePagination, Typography, useMediaQuery, useTheme } from '@mui/material'
+import { Box, Checkbox, Stack, TablePagination, Typography, useMediaQuery, useTheme } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
-import type { DataGridProps, GridColDef, GridValidRowModel } from '@mui/x-data-grid'
-import type { ReactNode } from 'react'
+import type { DataGridProps, GridColDef, GridRowId, GridRowSelectionModel, GridValidRowModel } from '@mui/x-data-grid'
+import { useCallback, type ReactNode } from 'react'
 import { esESGrid } from '../utils/enumLabels'
 
 type ResponsiveDataGridProps<R extends GridValidRowModel> = DataGridProps<R> & {
@@ -84,6 +84,63 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
   const rows = [...(props.rows ?? [])]
   const mobileRows = rows.slice(page * pageSize, page * pageSize + pageSize)
   const numericPageSizeOptions = (pageSizeOptions ?? [10, 25, 50]).filter((option): option is number => typeof option === 'number')
+  const getRowId = (row: R) => props.getRowId ? props.getRowId(row) : row.id
+  const defaultDesktopRowHeight = useCallback(() => 'auto' as const, [])
+  const isMobileRowSelected = (id: GridRowId) => {
+    const model = props.rowSelectionModel as GridRowSelectionModel | GridRowId[] | undefined
+    if (!model) return false
+    if (Array.isArray(model)) return model.includes(id)
+    return model.type === 'exclude' ? !model.ids.has(id) : model.ids.has(id)
+  }
+  const toggleMobileRowSelection = (id: GridRowId) => {
+    const allRowIds = rows.map(getRowId)
+    const currentModel = props.rowSelectionModel as GridRowSelectionModel | GridRowId[] | undefined
+    const currentIds = Array.isArray(currentModel)
+      ? new Set<GridRowId>(currentModel)
+      : currentModel?.type === 'exclude'
+        ? new Set<GridRowId>(allRowIds.filter((rowId) => !currentModel.ids.has(rowId)))
+        : new Set<GridRowId>(currentModel?.ids ?? [])
+
+    if (currentIds.has(id)) {
+      currentIds.delete(id)
+    } else {
+      currentIds.add(id)
+    }
+
+    props.onRowSelectionModelChange?.({ type: 'include', ids: currentIds }, {} as any)
+  }
+
+  const checkboxSx = {
+    width: 34,
+    height: 34,
+    borderRadius: 2,
+    color: 'primary.main',
+    transition: 'background-color 0.16s ease, transform 0.16s ease',
+    '&:hover': {
+      bgcolor: 'action.selected',
+      transform: 'scale(1.04)',
+    },
+    '& .MuiSvgIcon-root': {
+      width: 22,
+      height: 22,
+      borderRadius: 1.15,
+      color: 'transparent',
+      border: '2px solid',
+      borderColor: 'primary.main',
+      bgcolor: 'transparent',
+      boxShadow: '0 0 0 3px color-mix(in srgb, var(--himalaya-primary) 8%, transparent)',
+      transition: 'all 0.16s ease',
+    },
+    '&.Mui-checked .MuiSvgIcon-root, &.MuiCheckbox-indeterminate .MuiSvgIcon-root': {
+      color: 'primary.contrastText',
+      borderColor: 'primary.main',
+      bgcolor: 'primary.main',
+      boxShadow: '0 8px 18px color-mix(in srgb, var(--himalaya-primary) 28%, transparent)',
+    },
+    '&.Mui-disabled': {
+      opacity: 0.45,
+    },
+  } as const
 
   if (isMobile) {
     return (
@@ -92,28 +149,51 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
           width: '100%',
           minWidth: 0,
           bgcolor: 'background.paper',
-          borderRadius: 2,
+          borderRadius: 4,
           overflow: 'hidden',
-          boxShadow: '0 4px 14px 0 rgba(0,0,0,0.05)',
+          boxShadow: 'var(--himalaya-shadow)',
           border: '1px solid',
           borderColor: 'divider',
+          background: (theme) => theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(12,27,42,0.94), rgba(16,40,61,0.72))'
+            : 'linear-gradient(135deg, rgba(255,255,255,0.96), rgba(238,247,255,0.78))',
         }}
       >
-        <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'divider' }} />}>
+        <Stack spacing={1.25} sx={{ p: 1.25 }}>
           {mobileRows.map((row) => {
-            const id = props.getRowId ? props.getRowId(row) : row.id
+            const id = getRowId(row)
+            const selected = isMobileRowSelected(id)
             return (
               <Box
                 key={String(id)}
                 onClick={(event) => props.onRowClick?.({ id, row } as any, event as any, {} as any)}
                 sx={{
                   px: 2,
-                  py: 1,
+                  py: 1.25,
+                  borderRadius: 3,
+                  border: '1px solid',
+                  borderColor: selected ? 'primary.main' : 'divider',
                   cursor: props.onRowClick ? 'pointer' : 'default',
-                  '&:hover': { bgcolor: props.onRowClick ? 'action.hover' : undefined },
+                  bgcolor: selected ? 'action.selected' : undefined,
+                  boxShadow: selected ? '0 12px 26px rgba(7,89,133,0.12)' : undefined,
+                  '&:hover': { bgcolor: props.onRowClick ? 'action.hover' : undefined, borderColor: 'primary.main' },
                 }}
               >
-                {mobileRenderRow ? mobileRenderRow(row) : defaultMobileRenderRow(columns, row)}
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+                  {props.checkboxSelection && (
+                    <Checkbox
+                      checked={selected}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        toggleMobileRowSelection(id)
+                      }}
+                      sx={{ ...checkboxSx, mt: -0.5, ml: -0.75, flexShrink: 0 }}
+                    />
+                  )}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    {mobileRenderRow ? mobileRenderRow(row) : defaultMobileRenderRow(columns, row)}
+                  </Box>
+                </Stack>
               </Box>
             )
           })}
@@ -147,11 +227,15 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
         width: '100%',
         minWidth: 0,
         bgcolor: 'background.paper',
-        borderRadius: { xs: 2, sm: 3 },
+        borderRadius: { xs: 3, sm: 4 },
         overflow: 'hidden',
-        boxShadow: '0 4px 14px 0 rgba(0,0,0,0.05)',
+        boxShadow: 'var(--himalaya-shadow)',
         border: '1px solid',
         borderColor: 'divider',
+        background: (theme) => theme.palette.mode === 'dark'
+          ? 'linear-gradient(135deg, rgba(12,27,42,0.96), rgba(16,40,61,0.78))'
+          : 'linear-gradient(135deg, rgba(255,255,255,0.98), rgba(238,247,255,0.82))',
+        p: 1,
       }}
     >
       <DataGrid
@@ -161,15 +245,83 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
         pageSizeOptions={pageSizeOptions ?? [10, 25, 50]}
         disableRowSelectionOnClick={props.disableRowSelectionOnClick ?? true}
         showToolbar={props.showToolbar ?? true}
+        getRowHeight={props.getRowHeight ?? defaultDesktopRowHeight}
+        columnHeaderHeight={props.columnHeaderHeight ?? 58}
         sx={[
           {
             border: 'none',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600, color: 'text.secondary' },
-            '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', color: 'text.primary' },
-            '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' },
-            '& .MuiDataGrid-toolbarContainer': { px: 1.5, py: 1, gap: 1, borderBottom: '1px solid', borderColor: 'divider' },
+            bgcolor: 'transparent',
+            '& .MuiDataGrid-main': {
+              borderRadius: 3,
+              overflow: 'hidden',
+              bgcolor: 'background.paper',
+            },
+            '& .MuiDataGrid-columnHeaders': { bgcolor: 'action.selected', borderBottom: '1px solid', borderColor: 'divider' },
+            '& .MuiDataGrid-columnHeader': { px: 1.5 },
+            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 900, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.6, fontSize: '0.72rem' },
+            '& .MuiDataGrid-row': { transition: 'background-color 0.16s ease, box-shadow 0.16s ease', minHeight: '58px !important' },
+            '& .MuiDataGrid-row:hover': { bgcolor: 'action.hover' },
+            '& .MuiDataGrid-row.Mui-selected': { bgcolor: 'action.selected', '&:hover': { bgcolor: 'action.selected' } },
+            '& .MuiDataGrid-cell': {
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              color: 'text.primary',
+              py: 1.15,
+              display: 'flex',
+              alignItems: 'center',
+              minHeight: '58px !important',
+              lineHeight: 1.35,
+            },
+            '& .MuiDataGrid-cellContent': {
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            },
+            '& .MuiDataGrid-cell .MuiChip-root': {
+              maxWidth: '100%',
+              borderRadius: 2,
+              fontWeight: 800,
+            },
+            '& .MuiDataGrid-cell .MuiChip-label': {
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            },
+            '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
+            '& .MuiDataGrid-toolbarContainer': { m: 1, mb: 0.75, px: 1.25, py: 1, gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 3, bgcolor: 'background.paper' },
+            '& .MuiDataGrid-toolbarContainer .MuiButtonBase-root': { borderRadius: 99 },
+            '& .MuiDataGrid-columnHeaderCheckbox, & .MuiDataGrid-cellCheckbox': {
+              px: 1.25,
+            },
+            '& .MuiDataGrid-checkboxInput': {
+              width: 34,
+              height: 34,
+              borderRadius: 2,
+              color: 'primary.main',
+              transition: 'background-color 0.16s ease, transform 0.16s ease',
+              '&:hover': {
+                bgcolor: 'action.selected',
+                transform: 'scale(1.04)',
+              },
+              '& .MuiSvgIcon-root': {
+                width: 22,
+                height: 22,
+                borderRadius: 1.15,
+                color: 'transparent',
+                border: '2px solid',
+                borderColor: 'primary.main',
+                bgcolor: 'transparent',
+                boxShadow: '0 0 0 3px color-mix(in srgb, var(--himalaya-primary) 8%, transparent)',
+                transition: 'all 0.16s ease',
+              },
+              '&.Mui-checked .MuiSvgIcon-root, &.MuiCheckbox-indeterminate .MuiSvgIcon-root': {
+                color: 'primary.contrastText',
+                borderColor: 'primary.main',
+                bgcolor: 'primary.main',
+                boxShadow: '0 8px 18px color-mix(in srgb, var(--himalaya-primary) 28%, transparent)',
+              },
+            },
             '& .MuiDataGrid-cell:focus, & .MuiDataGrid-columnHeader:focus': { outline: 'none' },
+            '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
           },
           ...(Array.isArray(sx) ? sx : [sx]),
         ]}

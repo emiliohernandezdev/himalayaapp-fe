@@ -33,7 +33,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-        <Toaster closeButton theme={mode} position="bottom-right" richColors />
+        <Toaster closeButton theme={mode} position="bottom-right" richColors expand={true} />
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage mode={mode} />} />

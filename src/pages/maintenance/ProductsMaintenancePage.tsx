@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, TextField, Typography } from '@mui/material'
-import type { GridColDef } from '@mui/x-data-grid'
-import { Edit2, MoreVertical, PackageCheck, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
+import { Edit2, MoreVertical, PackageCheck, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
@@ -14,6 +14,8 @@ import { ResponsiveDataGrid } from '../../components/ResponsiveDataGrid'
 import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { esESGrid, productCategoryLabels, productStatusLabels, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
+import { MaintenanceFab } from '../../components/MaintenanceFab'
+import { createEmptyGridSelectionModel, getSelectedGridIds } from '../../utils/gridSelection'
 
 const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((val) => (val === '' ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
@@ -36,13 +38,20 @@ export function ProductsMaintenancePage() {
   const { data: providers } = useApiQuery('providers-for-select', fetchProviders)
   const permissionsLoading = usePermissionLoading()
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
+  const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>(() => createEmptyGridSelectionModel())
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [selected, setSelected] = useState<ProductRaw | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const selectedIds = useMemo(
+    () => getSelectedGridIds(rowSelectionModel, (products ?? []).map((product) => product.uuid)),
+    [products, rowSelectionModel],
+  )
+  const selectedCount = selectedIds.length
 
   const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
@@ -107,6 +116,22 @@ export function ProductsMaintenancePage() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    setIsDeleting(true)
+    try {
+      await Promise.all(selectedIds.map((uuid) => removeProduct(uuid)))
+      toast.success(`${selectedIds.length} productos eliminados`)
+      setBulkDeleteDialogOpen(false)
+      setRowSelectionModel(createEmptyGridSelectionModel())
+      refetch()
+    } catch {
+      toast.error('Error al eliminar los productos seleccionados')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const columns: GridColDef[] = [
     { field: 'name', headerName: 'Nombre', flex: 1, minWidth: 200 },
     {
@@ -165,12 +190,6 @@ export function ProductsMaintenancePage() {
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Productos" description="Productos de seguro asociados a proveedores y ramos." actionLabel="" icon={PackageCheck} />
         </Box>
-        {canManageProducts && (
-          <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
-            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-            Nuevo producto
-          </Button>
-        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de productos.</Alert>}
@@ -181,6 +200,9 @@ export function ProductsMaintenancePage() {
         columns={columns}
         getRowId={(row) => row.uuid}
         loading={loading}
+        checkboxSelection={canManageProducts}
+        rowSelectionModel={rowSelectionModel}
+        onRowSelectionModelChange={setRowSelectionModel}
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
         localeText={esESGrid}
@@ -208,6 +230,7 @@ export function ProductsMaintenancePage() {
               <Controller name="name" control={control} render={({ field }) => (
                 <TextField
                   {...field}
+                  type="text"
                   label="Nombre del Producto *"
                   fullWidth
                   error={!!errors.name}
@@ -250,7 +273,7 @@ export function ProductsMaintenancePage() {
               </Stack>
 
               <Controller name="lineOfBusiness" control={control} render={({ field }) => (
-                <TextField {...field} label="Línea de Negocio" fullWidth error={!!errors.lineOfBusiness} helperText={errors.lineOfBusiness?.message?.toString() ?? ' '} />
+                <TextField {...field} type="text" label="Línea de Negocio" fullWidth error={!!errors.lineOfBusiness} helperText={errors.lineOfBusiness?.message?.toString() ?? ' '} />
               )} />
 
               <Controller name="description" control={control} render={({ field }) => (
@@ -299,6 +322,40 @@ export function ProductsMaintenancePage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={bulkDeleteDialogOpen} onClose={() => !isDeleting && setBulkDeleteDialogOpen(false)} slotProps={{ paper: { sx: { borderRadius: 3, maxWidth: 420 } } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Trash2 size={20} color="var(--mui-palette-error-main)" /> Eliminar productos
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'text.primary', mt: 1 }}>
+            ¿Eliminar <strong>{selectedCount}</strong> productos seleccionados? Esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button onClick={() => setBulkDeleteDialogOpen(false)} disabled={isDeleting} sx={{ color: 'text.secondary' }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={isDeleting}
+            onClick={handleBulkDelete}
+            startIcon={isDeleting ? <CircularProgress size={16} color="inherit" /> : <Trash2 size={16} />}
+          >
+            {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {canManageProducts && (
+        <MaintenanceFab
+          label={selectedCount > 0 ? `Eliminar ${selectedCount} productos` : 'Nuevo producto'}
+          onClick={selectedCount > 0 ? () => setBulkDeleteDialogOpen(true) : openCreate}
+          icon={selectedCount > 0 ? <Trash2 size={24} /> : undefined}
+          color={selectedCount > 0 ? 'error' : 'primary'}
+        />
+      )}
     </Stack>
   )
 }

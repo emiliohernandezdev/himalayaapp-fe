@@ -10,6 +10,10 @@ export function useApiQuery<TData>(queryKey: string, queryFn: () => Promise<TDat
   const refetch = useCallback(() => setTick((value) => value + 1), [])
 
   useEffect(() => {
+    setData(null)
+  }, [queryKey])
+
+  useEffect(() => {
     let active = true
 
     setLoading(true)

@@ -257,6 +257,12 @@ export type PolicyRaw = {
   insuredAmount?: number | null
   currency: string
   notes?: string | null
+  paymentMethod?: string | null
+  cardBrand?: string | null
+  cardLastFour?: string | null
+  billingFrequency?: string | null
+  billingInstallments?: number | null
+  installmentAmount?: number | null
   clientUuid: string
   providerUuid: string
   productUuid: string

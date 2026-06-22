@@ -156,6 +156,40 @@ export function createHimalayaTheme(mode: PaletteMode) {
             root: {
               borderRadius: 8,
               fontWeight: 700,
+              borderColor: palette.border,
+            },
+            filled: {
+              boxShadow: isLight
+                ? '0 4px 12px rgba(15, 23, 42, 0.06)'
+                : '0 4px 14px rgba(0, 0, 0, 0.24)',
+            },
+          },
+        },
+        MuiSelect: {
+          styleOverrides: {
+            root: {
+              borderRadius: 8,
+            },
+          },
+        },
+        MuiAutocomplete: {
+          styleOverrides: {
+            paper: {
+              border: `1px solid ${palette.border}`,
+              boxShadow: isLight
+                ? '0 18px 42px rgba(15, 23, 42, 0.12)'
+                : '0 18px 42px rgba(0, 0, 0, 0.42)',
+            },
+          },
+        },
+        MuiDialog: {
+          styleOverrides: {
+            paper: {
+              border: `1px solid ${palette.border}`,
+              backgroundImage: 'none',
+              boxShadow: isLight
+                ? '0 24px 70px rgba(15, 23, 42, 0.16)'
+                : '0 24px 70px rgba(0, 0, 0, 0.52)',
             },
           },
         },
@@ -169,6 +203,21 @@ export function createHimalayaTheme(mode: PaletteMode) {
         MuiTextField: {
           defaultProps: {
             variant: 'outlined',
+          },
+        },
+        MuiOutlinedInput: {
+          styleOverrides: {
+            root: {
+              borderRadius: 8,
+              backgroundColor: alpha(palette.surface, isLight ? 0.72 : 0.46),
+              transition: 'background-color 0.18s ease, box-shadow 0.18s ease',
+              '&:hover': {
+                backgroundColor: alpha(palette.surfaceSoft, isLight ? 0.82 : 0.62),
+              },
+              '&.Mui-focused': {
+                boxShadow: `0 0 0 3px ${alpha(palette.primary, isLight ? 0.14 : 0.2)}`,
+              },
+            },
           },
         },
       },

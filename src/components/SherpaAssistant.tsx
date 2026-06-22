@@ -147,10 +147,10 @@ function SummitAssistantInner() {
     const activePanel = drawerEl || dialogEl
 
     if (activePanel) {
-      const drawerText = activePanel.textContent || ''
-      const caseCodeMatch = drawerText.match(/CAS-\d+-\d+/)
+      const caseNumberEl = activePanel.querySelector('[data-case-number]')
+      const activeCaseNumber = caseNumberEl?.getAttribute('data-case-number')
 
-      if (caseCodeMatch) {
+      if (activeCaseNumber) {
         const headingEl = activePanel.querySelector('h2, h3, .MuiTypography-h5, .MuiTypography-h6')
         const labelsAndValues = Array.from(activePanel.querySelectorAll('.MuiTypography-root'))
 
@@ -173,7 +173,7 @@ function SummitAssistantInner() {
 
         context.activeEntity = {
           type: 'case',
-          idCode: caseCodeMatch[0],
+          idCode: activeCaseNumber,
           title: headingEl?.textContent || 'Detalle del Caso',
           clientName: clientName.trim() || undefined,
           assignedTo: assignedTo.trim() || undefined,
@@ -563,16 +563,24 @@ Por favor procesa la siguiente solicitud del usuario:
     }
 
     // 7. Fallback General Action/Response
-    setTimeout(() => {
+    setTimeout(async () => {
       if (normalized.includes('autocompletar') || normalized.includes('rellenar')) {
         executeFormAutofill()
         return
       }
       if (normalized.includes('cerrar caso')) {
-        const matchCode = normalized.match(/cas-\d+-\d+/)
-        if (matchCode) {
-          closeCaseDirectly(matchCode[0].toUpperCase())
-          return
+        const words = normalized.toUpperCase().split(/\s+/)
+        try {
+          const casesList = await fetchCases()
+          const foundCase = casesList.find(c => 
+            words.some(w => w === c.caseNumber.toUpperCase())
+          )
+          if (foundCase) {
+            closeCaseDirectly(foundCase.caseNumber)
+            return
+          }
+        } catch (e) {
+          // ignore
         }
       }
 

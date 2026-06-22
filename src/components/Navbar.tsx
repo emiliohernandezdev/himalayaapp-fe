@@ -1,4 +1,4 @@
-﻿import { Alert, Avatar, Box, Button, Container, Dialog, DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography, Menu, MenuItem, ListItemIcon, Divider, ButtonBase, Badge, Chip } from '@mui/material'
+import { Alert, Avatar, Box, Button, Container, Dialog, DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography, Menu, MenuItem, ListItemIcon, Divider, ButtonBase, Badge, Chip } from '@mui/material'
 import type { PaletteMode } from '@mui/material/styles'
 import type { GridColDef } from '@mui/x-data-grid'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -427,12 +427,9 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
 
     setCreatingRenewalCases(true)
     try {
-      const year = new Date().getFullYear()
       await Promise.all(
-        policyDialogPolicies.map((policy, index) => {
-          const sequence = `${Date.now()}${index}`.slice(-8)
+        policyDialogPolicies.map((policy) => {
           return createCase({
-            caseNumber: `CAS-${year}-${sequence}`,
             title: `Seguimiento de renovación ${policy.policyNumber}`,
             description: `Seguimiento generado desde notificación de renovación para la póliza ${policy.policyNumber}. Vence el ${dayjs(policy.endDate).format('DD/MM/YYYY')}.`,
             type: 'Renewal',
@@ -486,18 +483,59 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
   return (
     <Box
       component="header"
-      className="sticky top-0 z-20 border-b border-[var(--himalaya-border)] bg-[var(--himalaya-surface)]/95 backdrop-blur"
+      className="sticky top-0 z-20 px-3 pt-3 sm:px-5"
+      sx={{ pointerEvents: 'none' }}
     >
-      <Container maxWidth="xl" className="px-4 py-2.5 sm:px-6">
-        <Stack direction="row" sx={{ alignItems: 'center', gap: { xs: 1, sm: 2 }, justifyContent: 'space-between' }}>
+      <Container maxWidth="xl" disableGutters>
+        <Stack
+          direction="row"
+          sx={{
+            pointerEvents: 'auto',
+            alignItems: 'center',
+            gap: { xs: 1, sm: 2 },
+            justifyContent: 'space-between',
+            px: { xs: 1.25, sm: 2 },
+            py: 1.1,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 99,
+            background: (theme) => theme.palette.mode === 'dark'
+              ? 'linear-gradient(135deg, rgba(12,27,42,0.88), rgba(16,40,61,0.72))'
+              : 'linear-gradient(135deg, rgba(255,255,255,0.90), rgba(238,247,255,0.74))',
+            boxShadow: (theme) => theme.palette.mode === 'dark'
+              ? '0 24px 70px rgba(0,0,0,0.46)'
+              : '0 22px 60px rgba(7,89,133,0.14)',
+            backdropFilter: 'blur(22px)',
+          }}
+        >
           <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} sx={{ alignItems: 'center', minWidth: 0, flexGrow: 1 }}>
-            <HimalayaLogo className="h-9 w-12 shrink-0 sm:h-11 sm:w-15" />
+            <Box
+              sx={{
+                display: 'grid',
+                placeItems: 'center',
+                width: { xs: 50, sm: 62 },
+                height: { xs: 42, sm: 50 },
+                borderRadius: 99,
+                background: (theme) => theme.palette.mode === 'dark'
+                  ? 'linear-gradient(135deg, rgba(125,211,252,0.18), rgba(94,234,212,0.12))'
+                  : 'linear-gradient(135deg, rgba(224,242,254,0.98), rgba(207,250,254,0.72))',
+                border: '1px solid',
+                borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(125,211,252,0.28)' : 'rgba(7,89,133,0.16)',
+                boxShadow: (theme) => theme.palette.mode === 'dark'
+                  ? '0 10px 28px rgba(0, 0, 0, 0.28)'
+                  : '0 12px 28px rgba(7, 89, 133, 0.14)',
+                color: 'primary.main',
+                flexShrink: 0,
+              }}
+            >
+              <HimalayaLogo className="h-9 w-12 sm:h-11 sm:w-14" />
+            </Box>
             <Box className="min-w-0" sx={{ mr: { xs: 0.5, sm: 1 } }}>
-              <Typography variant="h6" component="h1" sx={{ fontWeight: 850, fontSize: { xs: '1.05rem', sm: '1.25rem' } }} className="truncate">
-                Himalaya
+              <Typography variant="h6" component="h1" sx={{ fontWeight: 950, fontSize: { xs: '1.05rem', sm: '1.32rem' }, lineHeight: 1.18 }} className="truncate">
+                Seguros Himalaya
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' }, fontSize: '0.75rem' }} className="truncate">
-                Administracion de seguros y fianzas
+              <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' }, fontSize: '0.76rem', fontWeight: 750, lineHeight: 1.35, letterSpacing: 0 }} className="truncate">
+                Aplicativo de manejo de seguros
               </Typography>
             </Box>
             <Tooltip title="Abrir mantenimientos">
@@ -505,8 +543,8 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
                 aria-label="Abrir mantenimientos"
                 onClick={() => setMaintenanceOpen(true)}
                 size="small"
-                className="shrink-0 border border-[var(--himalaya-border)]"
-                sx={{ p: 0.75 }}
+                className="shrink-0"
+                sx={{ p: 0.9, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', boxShadow: '0 8px 18px rgba(15,23,42,0.08)' }}
               >
                 <AppLauncherIcon />
               </IconButton>
@@ -520,8 +558,8 @@ export function Navbar({ mode, onToggleMode }: NavbarProps) {
               <IconButton
                 onClick={handleNotificationMenuOpen}
                 size="small"
-                className="shrink-0 border border-[var(--himalaya-border)]"
-                sx={{ p: 0.75 }}
+                className="shrink-0"
+                sx={{ p: 0.9, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', boxShadow: '0 8px 18px rgba(15,23,42,0.08)' }}
               >
                 <Badge badgeContent={unreadCount} color="error" max={99} variant="standard" sx={{ '& .MuiBadge-badge': { fontWeight: 800 } }}>
                   <Bell size={18} />

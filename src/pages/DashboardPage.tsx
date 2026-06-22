@@ -504,24 +504,25 @@ function WidgetShell({
   onRefresh?: () => void
 }) {
   return (
-    <Stack spacing={1.75} sx={{ height: '100%', minWidth: 0 }}>
-      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
+    <Stack spacing={1.75} sx={{ height: '100%', minWidth: 0, position: 'relative', zIndex: 1 }}>
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', pb: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}>
         <Stack direction="row" spacing={1.25} sx={{ minWidth: 0, flex: 1 }}>
           <Box
             className="grid h-11 w-11 shrink-0 place-items-center text-[var(--himalaya-primary)]"
             sx={{
-              borderRadius: 3,
-              bgcolor: 'action.hover',
+              borderRadius: 2.5,
+              background: 'linear-gradient(135deg, var(--himalaya-primary-soft), color-mix(in srgb, var(--himalaya-accent) 14%, transparent))',
               border: '1px solid',
               borderColor: 'divider',
+              boxShadow: '0 12px 26px color-mix(in srgb, var(--himalaya-primary) 16%, transparent)',
             }}
           >
             <Icon size={19} />
           </Box>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="subtitle1" noWrap sx={{ fontWeight: 760, fontSize: '0.96rem', letterSpacing: 0 }}>{title}</Typography>
+            <Typography variant="subtitle1" noWrap sx={{ fontWeight: 900, fontSize: '0.98rem', letterSpacing: 0, color: 'text.primary' }}>{title}</Typography>
             {description && (
-              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', maxWidth: '90%', mt: 0.15 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: '-webkit-box', maxWidth: '95%', mt: 0.2, overflow: 'hidden', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.25 }}>
                 {description}
               </Typography>
             )}
@@ -576,7 +577,8 @@ function WidgetShell({
           minHeight: 0,
           flex: 1,
           overflow: 'auto',
-          pr: 0.5
+          pr: 0.5,
+          pb: 0.25,
         }}
       >
         {children}
@@ -593,10 +595,10 @@ function renderWidgetMiniPreview(presentationType?: string) {
   if (type === 'Metric') {
     return (
       <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
+        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
         <rect x="8" y="8" width="28" height="5" rx="1.5" fill="#94A3B8" />
-        <text x="8" y="34" font-family="sans-serif" font-size="20" font-weight="bold" fill="#0F172A">92</text>
-        <path d="M44 26L48 22L52 26L56 18" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="8" y="34" fontFamily="sans-serif" fontSize="20" fontWeight="bold" fill="#0F172A">92</text>
+        <path d="M44 26L48 22L52 26L56 18" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     )
   }
@@ -604,13 +606,13 @@ function renderWidgetMiniPreview(presentationType?: string) {
   if (type === 'Pie Chart') {
     return (
       <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
-        <circle cx="24" cy="24" r="12" stroke="#E2E8F0" stroke-width="3" fill="none" />
-        <path d="M24 12C30.6274 12 36 17.3726 36 24" stroke="#0D9488" stroke-width="3" stroke-linecap="round" />
-        <path d="M36 24C36 30.6274 30.6274 36 24 36C17.3726 36 12 30.6274 12 24" stroke="#0F766E" stroke-width="3" stroke-linecap="round" />
-        <line x1="44" y1="18" x2="54" y2="18" stroke="#0D9488" stroke-width="2" stroke-linecap="round" />
-        <line x1="44" y1="24" x2="54" y2="24" stroke="#0F766E" stroke-width="2" stroke-linecap="round" />
-        <line x1="44" y1="30" x2="50" y2="30" stroke="#F43F5E" stroke-width="2" stroke-linecap="round" />
+        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
+        <circle cx="24" cy="24" r="12" stroke="#E2E8F0" strokeWidth="3" fill="none" />
+        <path d="M24 12C30.6274 12 36 17.3726 36 24" stroke="#0D9488" strokeWidth="3" strokeLinecap="round" />
+        <path d="M36 24C36 30.6274 30.6274 36 24 36C17.3726 36 12 30.6274 12 24" stroke="#0F766E" strokeWidth="3" strokeLinecap="round" />
+        <line x1="44" y1="18" x2="54" y2="18" stroke="#0D9488" strokeWidth="2" strokeLinecap="round" />
+        <line x1="44" y1="24" x2="54" y2="24" stroke="#0F766E" strokeWidth="2" strokeLinecap="round" />
+        <line x1="44" y1="30" x2="50" y2="30" stroke="#F43F5E" strokeWidth="2" strokeLinecap="round" />
       </svg>
     )
   }
@@ -618,7 +620,7 @@ function renderWidgetMiniPreview(presentationType?: string) {
   if (type === 'Bars Chart' || type === 'Bar Chart') {
     return (
       <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
+        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
         <rect x="10" y="28" width="6" height="12" rx="1.5" fill="#7C3AED" />
         <rect x="20" y="16" width="6" height="24" rx="1.5" fill="#8B5CF6" />
         <rect x="30" y="22" width="6" height="18" rx="1.5" fill="#A78BFA" />
@@ -630,8 +632,8 @@ function renderWidgetMiniPreview(presentationType?: string) {
   if (type === 'Line Chart' || type === 'Sparkline') {
     return (
       <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
-        <path d="M8 32C15 28 20 12 28 16C36 20 40 32 46 24C50 18 52 14 56 10" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
+        <path d="M8 32C15 28 20 12 28 16C36 20 40 32 46 24C50 18 52 14 56 10" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <circle cx="56" cy="10" r="2" fill="#34D399" />
       </svg>
     )
@@ -640,7 +642,7 @@ function renderWidgetMiniPreview(presentationType?: string) {
   if (type === 'Scatter Chart') {
     return (
       <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
+        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
         <circle cx="16" cy="32" r="2" fill="#D97706" />
         <circle cx="26" cy="18" r="2" fill="#F59E0B" />
         <circle cx="34" cy="34" r="2" fill="#FBBF24" />
@@ -655,11 +657,11 @@ function renderWidgetMiniPreview(presentationType?: string) {
   if (type === 'Gauge') {
     return (
       <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
-        <path d="M14 34C14 22 22 14 32 14C42 14 50 22 50 34" stroke="#FDA4AF" stroke-width="4" stroke-linecap="round" fill="none" />
-        <path d="M14 34C14 22 22 14 32 14" stroke="#E11D48" stroke-width="4" stroke-linecap="round" fill="none" />
+        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
+        <path d="M14 34C14 22 22 14 32 14C42 14 50 22 50 34" stroke="#FDA4AF" strokeWidth="4" strokeLinecap="round" fill="none" />
+        <path d="M14 34C14 22 22 14 32 14" stroke="#E11D48" strokeWidth="4" strokeLinecap="round" fill="none" />
         <circle cx="32" cy="34" r="3" fill="#4C0519" />
-        <path d="M32 34L40 20" stroke="#4C0519" stroke-width="2" stroke-linecap="round" />
+        <path d="M32 34L40 20" stroke="#4C0519" strokeWidth="2" strokeLinecap="round" />
       </svg>
     )
   }
@@ -667,7 +669,7 @@ function renderWidgetMiniPreview(presentationType?: string) {
   if (type === 'DataGrid') {
     return (
       <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
+        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
         <rect x="6" y="8" width="52" height="6" fill="#64748B" rx="1" />
         <rect x="6" y="18" width="14" height="4" fill="#94A3B8" rx="1" />
         <rect x="24" y="18" width="20" height="4" fill="#CBD5E1" rx="1" />
@@ -685,7 +687,7 @@ function renderWidgetMiniPreview(presentationType?: string) {
   if (type === 'Shortcuts') {
     return (
       <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
+        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
         <rect x="8" y="8" width="20" height="13" rx="2" fill="#3B82F6" />
         <rect x="36" y="8" width="20" height="13" rx="2" fill="#60A5FA" />
         <rect x="8" y="27" width="20" height="13" rx="2" fill="#60A5FA" />
@@ -697,7 +699,7 @@ function renderWidgetMiniPreview(presentationType?: string) {
   if (type === 'List') {
     return (
       <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
+        <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
         <circle cx="12" cy="14" r="2.5" fill="#A855F7" />
         <rect x="20" y="12" width="36" height="4" rx="1" fill="#A855F7" />
         <circle cx="12" cy="24" r="2.5" fill="#C084FC" />
@@ -711,7 +713,7 @@ function renderWidgetMiniPreview(presentationType?: string) {
   // Default fallback
   return (
     <svg width="64" height="48" viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
+      <rect width="64" height="48" rx="6" fill="#F8FAFC" stroke="#E2E8F0" strokeWidth="1.5" />
       <circle cx="32" cy="24" r="6" fill="#94A3B8" />
     </svg>
   )
@@ -1862,6 +1864,7 @@ export function DashboardPage() {
   const [_widgetSettingsErrors, _setWidgetSettingsErrors] = useState<WidgetSettingsErrors>({})
   const [widgetIdToRemove, setWidgetIdToRemove] = useState<string | null>(null)
   const [speedDialOpen, setSpeedDialOpen] = useState(false)
+  const [isSavingDashboard, setIsSavingDashboard] = useState(false)
   const [widgetRefreshVersions, setWidgetRefreshVersions] = useState<Record<string, number>>({})
 
   const refreshDashboardWidgets = useCallback(() => {
@@ -2010,10 +2013,13 @@ export function DashboardPage() {
       prev.map((d) => (d.name === currentDashboardName ? { ...d, config: updatedConfig } : d))
     )
 
+    setIsSavingDashboard(true)
     // Auto-save to server
     try {
       await saveUserDashboardApi(currentDashboardName, JSON.stringify(updatedConfig))
+      setIsSavingDashboard(false)
     } catch (err) {
+      setIsSavingDashboard(false)
       console.error('Error guardando configuración en base de datos:', err)
     }
   }
@@ -2064,6 +2070,8 @@ export function DashboardPage() {
     return list
   }, [currentDashboard, availableWidgetIds])
 
+  const activeDashboardLayout = currentDashboard?.config.layout ?? {}
+
   const syncLayoutFromGrid = () => {
     const grid = gridRef.current
     if (!grid) return
@@ -2086,10 +2094,13 @@ export function DashboardPage() {
     })
 
     layoutRef.current = nextLayout
-    persistConfig(visibilityRef.current, nextLayout, widgetSettings)
 
     if (customizeMode) {
-      setLayoutNotice('Diseño guardado automáticamente')
+      setLayoutNotice('Cambios sin guardar')
+      if (noticeTimeoutRef.current) window.clearTimeout(noticeTimeoutRef.current)
+    } else {
+      persistConfig(visibilityRef.current, nextLayout, widgetSettings)
+      setLayoutNotice('Diseño guardado')
       if (noticeTimeoutRef.current) window.clearTimeout(noticeTimeoutRef.current)
       noticeTimeoutRef.current = window.setTimeout(() => setLayoutNotice(''), 1400)
     }
@@ -2103,7 +2114,7 @@ export function DashboardPage() {
     // margin set to 18px and float set to false to prevent widget collisions and tight spacing
     const grid = GridStack.init(
       {
-        animate: true,
+        animate: customizeMode,
         column: 12,
         float: false,
         margin: 18,
@@ -2135,7 +2146,7 @@ export function DashboardPage() {
       grid.destroy(false)
       if (gridRef.current === grid) gridRef.current = null
     }
-  }, [activeWidgetInstances, customizeMode, data, layoutVersion])
+  }, [activeWidgetInstances, currentDashboardName, customizeMode, data, layoutVersion])
 
   const handleAddDashboard = async () => {
     if (!newDashboardName.trim()) return
@@ -2263,12 +2274,28 @@ export function DashboardPage() {
     const widget = widgetCatalog.find((w) => w.id === widgetId)
     if (!widget) return
 
-    // Prevent duplicate: same widgetId already in this dashboard
+    // Prevent duplicate of single-use widgets, or customizable widgets that are not configured yet
+    const isSingleton = ['Shortcuts', 'Security', 'SystemHealth', 'shortcuts', 'securityOverview'].includes(widget.presentationType) ||
+                        ['renewals', 'followUps', 'securityOverview'].includes(widgetId)
+
     const currentInstances = currentDashboard.config.instances ?? []
-    const existingCount = currentInstances.filter((inst) => inst.widgetId === widgetId).length
-    if (existingCount > 0) {
-      toast.warning(`Ya tienes un widget "${widget.title}" en este tablero. Configúralo antes de agregar otro.`)
-      return
+    const existingInstances = currentInstances.filter((inst) => inst.widgetId === widgetId)
+
+    if (isSingleton) {
+      if (existingInstances.length > 0) {
+        toast.warning(`Ya tienes el widget "${widget.title}" en este tablero. Este widget es de uso único.`)
+        return
+      }
+    } else {
+      const hasUnconfigured = existingInstances.some((inst) => {
+        const settings = widgetSettings[inst.id]
+        return !settings || !settings.dataSource
+      })
+
+      if (hasUnconfigured) {
+        toast.warning(`Ya tienes un widget "${widget.title}" sin configurar en este tablero. Configúralo antes de agregar otro.`)
+        return
+      }
     }
 
     const instanceId = `${widgetId}_${Date.now()}`
@@ -2400,7 +2427,7 @@ export function DashboardPage() {
       if (activeTab === 'security') return widget.category === 'Seguridad'
       return true
     })
-  }, [activeTab])
+  }, [activeTab, widgetCatalog])
 
   const renderWidget = (widget: WidgetDefinition, settings: WidgetSettings = {}, instanceId: string, refreshVersion = 0) => {
     if (loading || !data) {
@@ -2575,11 +2602,18 @@ export function DashboardPage() {
     if (customizeMode) {
       return [
         {
-          icon: <Lucide.Save size={20} />,
-          name: 'Guardar Cambios',
-          onClick: () => {
+          icon: isSavingDashboard ? <CircularProgress size={18} color="inherit" /> : <Lucide.Save size={20} />,
+          name: isSavingDashboard ? 'Guardando...' : 'Guardar Cambios',
+          onClick: async () => {
+            if (isSavingDashboard) return
+            syncLayoutFromGrid()
+            await persistConfig(visibilityRef.current, layoutRef.current, widgetSettings)
             setCustomizeMode(false)
             setSpeedDialOpen(false)
+            setLayoutNotice('Diseño guardado exitosamente')
+            if (noticeTimeoutRef.current) window.clearTimeout(noticeTimeoutRef.current)
+            noticeTimeoutRef.current = window.setTimeout(() => setLayoutNotice(''), 1400)
+            toast.success('Tablero guardado exitosamente.')
           },
           color: 'success.main',
           hoverColor: 'success.dark',
@@ -2651,7 +2685,7 @@ export function DashboardPage() {
         }] : []),
       ]
     }
-  }, [customizeMode, currentDashboard, currentDashboardName, dashboards.length, handleSetPrimary, isSettingPrimary])
+  }, [customizeMode, currentDashboard, currentDashboardName, dashboards.length, handleSetPrimary, isSavingDashboard, isSettingPrimary, widgetSettings])
 
   const dashboardContentLoading = loadingDashboards || loadingWidgetsCatalog || !data || !currentDashboard
 
@@ -2665,16 +2699,13 @@ export function DashboardPage() {
         elevation={0}
         sx={{
           p: 3,
-          borderRadius: 4,
+          borderRadius: 3,
           background: (theme) => theme.palette.mode === 'dark'
-            ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)'
-            : 'linear-gradient(135deg, rgba(239, 246, 255, 0.5) 0%, rgba(243, 244, 246, 0.6) 100%)',
-          border: (theme) => theme.palette.mode === 'dark'
-            ? '1px solid rgba(255, 255, 255, 0.08)'
-            : '1px solid rgba(0, 0, 0, 0.08)',
-          boxShadow: (theme) => theme.palette.mode === 'dark'
-            ? '0 8px 32px 0 rgba(0, 0, 0, 0.25)'
-            : '0 8px 32px 0 rgba(0, 0, 0, 0.05)',
+            ? 'linear-gradient(135deg, rgba(12, 27, 42, 0.92) 0%, rgba(16, 40, 61, 0.74) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(238, 247, 255, 0.82) 100%)',
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 'var(--himalaya-shadow)',
           position: 'relative',
           overflow: 'hidden',
           '&::before': {
@@ -2684,51 +2715,34 @@ export function DashboardPage() {
             left: 0,
             width: '100%',
             height: '3px',
-            background: 'linear-gradient(90deg, #38bdf8 0%, #3b82f6 50%, #818cf8 100%)',
+            background: 'linear-gradient(90deg, var(--himalaya-primary) 0%, var(--himalaya-accent) 100%)',
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            right: -80,
+            bottom: -120,
+            width: 320,
+            height: 220,
+            opacity: 0.14,
+            pointerEvents: 'none',
+            background:
+              'url("data:image/svg+xml,%3Csvg viewBox=%270 0 420 260%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cpath d=%27M0 260L92 126L162 198L258 74L420 260H0Z%27 fill=%27%23075985%27/%3E%3Cpath d=%27M258 74L226 114H294L258 74Z%27 fill=%27%23e0f2fe%27/%3E%3Cpath d=%27M92 126L70 160H116L92 126Z%27 fill=%27%23e0f2fe%27/%3E%3C/svg%3E") center / contain no-repeat',
           }
         }}
       >
-        <Grid container spacing={3} sx={{ alignItems: 'center' }}>
+        <Grid container spacing={3} sx={{ alignItems: 'center', position: 'relative', zIndex: 1 }}>
           <Grid size={{ xs: 12, md: 7 }}>
             <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
-              <Typography variant="h4" sx={{ fontWeight: 850, letterSpacing: '-0.02em', color: 'text.primary' }}>
-                Panel Operativo
-              </Typography>
-
-              <Box
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 99,
-                  bgcolor: (theme) => theme.palette.mode === 'dark'
-                    ? (loading ? 'rgba(56, 189, 248, 0.1)' : 'rgba(74, 222, 128, 0.1)')
-                    : (loading ? 'rgba(2, 132, 199, 0.08)' : 'rgba(22, 163, 74, 0.08)'),
-                  border: (theme) => theme.palette.mode === 'dark'
-                    ? (loading ? '1px solid rgba(56, 189, 248, 0.2)' : '1px solid rgba(74, 222, 128, 0.2)')
-                    : (loading ? '1px solid rgba(2, 132, 199, 0.15)' : '1px solid rgba(22, 163, 74, 0.15)'),
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    bgcolor: (theme) => theme.palette.mode === 'dark'
-                      ? (loading ? '#38bdf8' : '#4ade80')
-                      : (loading ? '#0284c7' : '#16a34a'),
-                    animation: loading ? 'none' : 'pulse-green 2.5s infinite',
-                    '@keyframes pulse-green': {
-                      '0%': { boxShadow: (theme) => `0 0 0 0 ${theme.palette.mode === 'dark' ? 'rgba(74, 222, 128, 0.7)' : 'rgba(22, 163, 74, 0.7)'}` },
-                      '70%': { boxShadow: '0 0 0 6px rgba(74, 222, 128, 0)' },
-                      '100%': { boxShadow: '0 0 0 0 rgba(74, 222, 128, 0)' },
-                    }
-                  }}
-                />
-                <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: (theme) => theme.palette.mode === 'dark' ? (loading ? '#38bdf8' : '#4ade80') : (loading ? '#0284c7' : '#16a34a'), textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {loading ? 'Actualizando' : 'En vivo'}
+              <Box sx={{ display: 'grid', placeItems: 'center', width: 62, height: 62, borderRadius: 3, bgcolor: 'action.selected', color: 'primary.main', border: '1px solid', borderColor: 'divider' }}>
+                <Lucide.LayoutDashboard size={28} />
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.4 }}>
+                  Centro de comando
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: 0, color: 'text.primary', lineHeight: 1 }}>
+                  Panel Operativo
                 </Typography>
               </Box>
             </Stack>
@@ -2779,13 +2793,31 @@ export function DashboardPage() {
                       px: 1.5,
                       py: 0.75,
                       borderRadius: 2,
-                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(22, 163, 74, 0.08)',
-                      border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid rgba(22, 163, 74, 0.15)',
-                      color: (theme) => theme.palette.mode === 'dark' ? '#4ade80' : '#16a34a',
+                      bgcolor: (theme) => {
+                        const isWarning = layoutNotice.toLowerCase().includes('sin guardar');
+                        if (isWarning) {
+                          return theme.palette.mode === 'dark' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(217, 119, 6, 0.08)';
+                        }
+                        return theme.palette.mode === 'dark' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(22, 163, 74, 0.08)';
+                      },
+                      border: (theme) => {
+                        const isWarning = layoutNotice.toLowerCase().includes('sin guardar');
+                        if (isWarning) {
+                          return theme.palette.mode === 'dark' ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(217, 119, 6, 0.15)';
+                        }
+                        return theme.palette.mode === 'dark' ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid rgba(22, 163, 74, 0.15)';
+                      },
+                      color: (theme) => {
+                        const isWarning = layoutNotice.toLowerCase().includes('sin guardar');
+                        if (isWarning) {
+                          return theme.palette.mode === 'dark' ? '#fbbf24' : '#b45309';
+                        }
+                        return theme.palette.mode === 'dark' ? '#4ade80' : '#16a34a';
+                      },
                     }}
                   >
-                    <CheckCircle2 size={14} />
-                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Guardado</Typography>
+                    {layoutNotice.toLowerCase().includes('sin guardar') ? <ShieldAlert size={14} /> : <CheckCircle2 size={14} />}
+                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 600 }}>{layoutNotice}</Typography>
                   </Box>
                 )}
               </Stack>
@@ -2816,19 +2848,34 @@ export function DashboardPage() {
       {loadingDashboards ? (
         <Skeleton variant="rectangular" width="100%" height={48} sx={{ borderRadius: 1.5, my: 1.5 }} />
       ) : (
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, pb: 1, mt: 1 }}>
+        <Box sx={{ border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', borderRadius: { xs: 4, sm: 99 }, display: 'flex', alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.25, p: { xs: 1, sm: 0.75 }, mt: 1, boxShadow: 'var(--himalaya-shadow)', overflow: 'hidden' }}>
           <Tabs
             value={currentDashboardName}
-            onChange={(_, val) => setCurrentDashboardName(val)}
+            onChange={(_, val) => {
+              if (val === currentDashboardName) return
+              gridRef.current?.destroy(false)
+              gridRef.current = null
+              setCurrentDashboardName(val)
+            }}
             variant="scrollable"
             scrollButtons="auto"
             sx={{
+              minHeight: 42,
+              maxWidth: '100%',
               '& .MuiTab-root': {
+                minHeight: 42,
+                borderRadius: { xs: 3, sm: 99 },
                 textTransform: 'none',
-                fontWeight: 600,
+                fontWeight: 800,
                 fontSize: '0.9rem',
                 minWidth: 100,
-              }
+              },
+              '& .Mui-selected': {
+                bgcolor: 'action.selected',
+              },
+              '& .MuiTabs-indicator': {
+                display: 'none',
+              },
             }}
           >
             {dashboards.map((d) => (
@@ -2954,7 +3001,7 @@ export function DashboardPage() {
         </Box>
       ) : (
         <Box
-          key={`${layoutVersion}-${customizeMode ? 'edit' : 'view'}-${activeWidgetInstances.map((inst) => inst.id).join('-')}`}
+          key={currentDashboardName}
           ref={gridHostRef}
           className={`grid-stack dashboard-grid${customizeMode ? ' is-editing' : ''}`}
         >
@@ -2962,7 +3009,7 @@ export function DashboardPage() {
             const widget = widgetCatalog.find((w) => w.id === inst.widgetId)
             if (!widget) return null
 
-            const layout = layoutRef.current[inst.id] ?? widget.defaultLayout
+            const layout = activeDashboardLayout[inst.id] ?? layoutRef.current[inst.id] ?? widget.defaultLayout
             const settings = widgetSettings[inst.id] ?? {}
             const title = settings.title || widget.title
             const isDynamicDataWidget = !['Shortcuts', 'Security', 'SystemHealth', 'shortcuts', 'securityOverview'].includes(widget.presentationType ?? '')
@@ -3188,38 +3235,38 @@ export function DashboardPage() {
                 </FormControl>
               )}
 
-              {/* ─── Chart-specific: group by ─── */}
-              {configuringWidget?.presentationType && (
-                configuringWidget.presentationType.includes('Chart') ||
-                configuringWidget.presentationType === 'Sparkline' ||
-                configuringWidget.presentationType === 'Gauge'
-              ) && tempSettings.dataSource && (
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Agrupar por</InputLabel>
-                    <Select
-                      label="Agrupar por"
-                      value={tempSettings.groupByField ?? 'status'}
-                      onChange={(e) => setTempSettings({ ...tempSettings, groupByField: e.target.value })}
-                    >
-                      {(tempSettings.dataSource === 'polizas' ? [
-                        { value: 'status', label: 'Estado de la Póliza' },
-                        { value: 'currency', label: 'Moneda de Pago' }
-                      ] : tempSettings.dataSource === 'casos' ? [
-                        { value: 'status', label: 'Estado del Caso' },
-                        { value: 'priority', label: 'Prioridad' },
-                        { value: 'type', label: 'Tipo de Caso' }
-                      ] : [
-                        { value: 'status', label: 'Estado de Cuenta' },
-                        { value: 'type', label: 'Tipo de cliente' },
-                        { value: 'department', label: 'Departamento' }
-                      ]).map((opt) => (
-                        <MenuItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
+              {/* ─── Agrupar por (N columnas) ─── */}
+              {tempSettings.dataSource && (
+                <FormControl fullWidth size="small">
+                  <InputLabel id="group-by-label">Agrupar por (N columnas)</InputLabel>
+                  <Select
+                    labelId="group-by-label"
+                    label="Agrupar por (N columnas)"
+                    multiple
+                    value={tempSettings.groupByField ? tempSettings.groupByField.split(',').map((s) => s.trim()).filter(Boolean) : []}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      const arr = Array.isArray(val) ? val : [val]
+                      setTempSettings({ ...tempSettings, groupByField: arr.join(',') })
+                    }}
+                    renderValue={(selected) => (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {(selected as string[]).map((value) => {
+                          const list = GROUP_BY_FIELDS_BY_SOURCE[tempSettings.dataSource ?? ''] ?? []
+                          const item = list.find((opt) => opt.value === value)
+                          return <Chip key={value} size="small" label={item?.label ?? value} />
+                        })}
+                      </Box>
+                    )}
+                  >
+                    {(GROUP_BY_FIELDS_BY_SOURCE[tempSettings.dataSource ?? ''] ?? []).map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
 
               {/* ─── DataGrid: columns + row limit ─── */}
               {configuringWidget?.presentationType === 'DataGrid' && tempSettings.dataSource && (
@@ -3290,12 +3337,16 @@ export function DashboardPage() {
                         value={tempSettings.aggregateFunction ?? 'count'}
                         onChange={(e) => {
                           const nextFunction = e.target.value
-                          const numericFields = NUMERIC_FIELDS_BY_SOURCE[tempSettings.dataSource ?? ''] ?? []
+                          const fields = tempSettings.dataSource === 'polizas'
+                            ? POLICY_FIELDS
+                            : tempSettings.dataSource === 'casos'
+                              ? CASE_FIELDS
+                              : CLIENT_FIELDS
                           setTempSettings({
                             ...tempSettings,
                             aggregateFunction: nextFunction,
-                            aggregateField: AGGREGATE_FIELD_REQUIRED.has(nextFunction)
-                              ? (numericFields[0]?.key ?? '')
+                            aggregateField: (AGGREGATE_FIELD_REQUIRED.has(nextFunction) || AGGREGATE_FIELD_OPTIONAL.has(nextFunction))
+                              ? (tempSettings.aggregateField || fields[0]?.key || '')
                               : tempSettings.aggregateField,
                             daysWindow: AGGREGATE_WINDOW_FUNCTIONS.has(nextFunction) ? (tempSettings.daysWindow ?? 30) : tempSettings.daysWindow,
                           })
@@ -3311,27 +3362,23 @@ export function DashboardPage() {
                         ))}
                       </Select>
                     </FormControl>
-
+ 
                     {(AGGREGATE_FIELD_REQUIRED.has(tempSettings.aggregateFunction ?? 'count') || AGGREGATE_FIELD_OPTIONAL.has(tempSettings.aggregateFunction ?? 'count')) && (
                       <FormControl fullWidth size="small">
-                        <InputLabel>Campo de calculo</InputLabel>
+                        <InputLabel>Campo de cálculo</InputLabel>
                         <Select
-                          label="Campo de calculo"
+                          label="Campo de cálculo"
                           value={tempSettings.aggregateField ?? ''}
                           onChange={(e) => setTempSettings({ ...tempSettings, aggregateField: e.target.value })}
                         >
-                          {AGGREGATE_FIELD_REQUIRED.has(tempSettings.aggregateFunction ?? 'count')
-                            ? (NUMERIC_FIELDS_BY_SOURCE[tempSettings.dataSource ?? ''] ?? []).map((field) => (
-                              <MenuItem key={field.key} value={field.key}>{field.label}</MenuItem>
-                            ))
-                            : (tempSettings.dataSource === 'polizas'
-                              ? POLICY_FIELDS
-                              : tempSettings.dataSource === 'casos'
-                                ? CASE_FIELDS
-                                : CLIENT_FIELDS
-                            ).map((field) => (
-                              <MenuItem key={field.key} value={field.key}>{field.label}</MenuItem>
-                            ))}
+                          {(tempSettings.dataSource === 'polizas'
+                            ? POLICY_FIELDS
+                            : tempSettings.dataSource === 'casos'
+                              ? CASE_FIELDS
+                              : CLIENT_FIELDS
+                          ).map((field) => (
+                            <MenuItem key={field.key} value={field.key}>{field.label}</MenuItem>
+                          ))}
                         </Select>
                       </FormControl>
                     )}
@@ -3814,28 +3861,29 @@ export function DashboardPage() {
             </Box>
             <Fab
               onClick={speedDialActions[0]?.onClick}
+              disabled={isSavingDashboard}
               sx={{
                 bgcolor: 'warning.main',
-                color: '#fff',
+                color: 'warning.contrastText',
                 '&:hover': {
                   bgcolor: 'warning.dark',
                 },
-                animation: 'pulse 2s infinite',
-                '@keyframes pulse': {
+                animation: 'pulse-save-btn 2s infinite',
+                '@keyframes pulse-save-btn': {
                   '0%': { boxShadow: '0 0 0 0 rgba(237, 108, 2, 0.5)' },
                   '70%': { boxShadow: '0 0 0 12px rgba(237, 108, 2, 0)' },
                   '100%': { boxShadow: '0 0 0 0 rgba(237, 108, 2, 0)' }
                 }
               }}
             >
-              <Lucide.Save />
+              {isSavingDashboard ? <CircularProgress size={24} color="inherit" /> : <Lucide.Save />}
             </Fab>
           </Stack>
         </Stack>
       ) : (
         <SpeedDial
           ariaLabel="Acciones de Tablero"
-          sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}
+          sx={{ position: 'fixed', bottom: { xs: 20, sm: 24 }, right: { xs: 20, sm: 24 }, zIndex: 1200 }}
           icon={<SpeedDialIcon icon={<Lucide.LayoutDashboard />} openIcon={<Lucide.LayoutDashboard />} />}
           onOpen={() => setSpeedDialOpen(true)}
           onClose={() => setSpeedDialOpen(false)}
@@ -3843,9 +3891,22 @@ export function DashboardPage() {
           FabProps={{
             sx: {
               bgcolor: 'primary.main',
-              color: '#fff',
+              color: 'primary.contrastText',
+              border: '1px solid',
+              borderColor: (theme) => theme.palette.primary.dark,
+              boxShadow: (theme) =>
+                theme.palette.mode === 'dark'
+                  ? `0 10px 28px ${theme.palette.primary.main}33`
+                  : `0 10px 28px ${theme.palette.primary.dark}33`,
+              transition: 'background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease',
               '&:hover': {
                 bgcolor: 'primary.dark',
+                color: 'primary.contrastText',
+                boxShadow: (theme) =>
+                  theme.palette.mode === 'dark'
+                    ? `0 14px 34px ${theme.palette.primary.main}40`
+                    : `0 14px 34px ${theme.palette.primary.dark}40`,
+                transform: 'translateY(-1px)',
               }
             }
           }}
@@ -3860,7 +3921,10 @@ export function DashboardPage() {
                   open: true
                 }
               }}
-              onClick={action.onClick}
+              onClick={(event) => {
+                event.stopPropagation()
+                action.onClick()
+              }}
               sx={{
                 '& .MuiSpeedDialAction-staticTooltipLabel': {
                   width: 'auto',
@@ -3952,14 +4016,6 @@ const AGGREGATE_FUNCTIONS = [
   { value: 'conversion_rate', label: 'Tasa de conversion', description: 'Activos sobre total filtrado' },
 ]
 
-const NUMERIC_FIELDS_BY_SOURCE: Record<string, Array<{ key: string; label: string }>> = {
-  clientes: [],
-  polizas: [
-    { key: 'premiumAmount', label: 'Prima' },
-    { key: 'insuredAmount', label: 'Monto asegurado' },
-  ],
-  casos: [],
-}
 
 const AGGREGATE_FIELD_REQUIRED = new Set(['sum', 'avg', 'min', 'max'])
 const AGGREGATE_FIELD_OPTIONAL = new Set(['distinct_count'])
@@ -4035,4 +4091,26 @@ const getFilterFieldOptions = (dataSource: string, field: string) => {
   }
 
   return null
+}
+
+const GROUP_BY_FIELDS_BY_SOURCE: Record<string, Array<{ value: string; label: string }>> = {
+  clientes: [
+    { value: 'status', label: 'Estado' },
+    { value: 'type', label: 'Tipo de cliente' },
+    { value: 'department', label: 'Departamento' },
+    { value: 'city', label: 'Ciudad' },
+  ],
+  polizas: [
+    { value: 'status', label: 'Estado de la póliza' },
+    { value: 'currency', label: 'Moneda de pago' },
+    { value: 'clientName', label: 'Cliente' },
+    { value: 'providerName', label: 'Aseguradora' },
+    { value: 'productName', label: 'Producto' },
+  ],
+  casos: [
+    { value: 'status', label: 'Estado del caso' },
+    { value: 'priority', label: 'Prioridad' },
+    { value: 'type', label: 'Tipo de caso' },
+    { value: 'assignedTo', label: 'Asignado a' },
+  ],
 }

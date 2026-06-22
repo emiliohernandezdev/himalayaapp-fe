@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, TextField, Typography } from '@mui/material'
-import type { GridColDef } from '@mui/x-data-grid'
-import { Edit2, MoreVertical, Plus, Trash2, UsersRound, Shield, FileText } from 'lucide-react'
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, TextField, Typography, alpha } from '@mui/material'
+import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
+import { Edit2, MoreVertical, Trash2, UsersRound, Shield, FileText, Calendar, Building2, CreditCard } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -14,20 +14,19 @@ import { ResponsiveDataGrid } from '../../components/ResponsiveDataGrid'
 import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { clientStatusLabels, clientTypeLabels, esESGrid, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
-
-const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
-  z.preprocess((val) => (val === '' ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
+import { MaintenanceFab } from '../../components/MaintenanceFab'
+import { createEmptyGridSelectionModel, getSelectedGridIds } from '../../utils/gridSelection'
 
 const clientSchema = z.object({
-  displayName: z.string().min(2, 'Mínimo 2 caracteres'),
+  displayName: z.string().trim().min(2, 'El nombre completo / razón social es requerido (mínimo 2 caracteres)'),
   type: z.enum(['Individual', 'Company']),
   status: z.enum(['Active', 'Inactive', 'Prospect']),
-  taxId: emptyToUndefined(z.string().optional()),
-  email: emptyToUndefined(z.string().email('Email inválido').optional()),
-  phone: emptyToUndefined(z.string().optional()),
-  address: emptyToUndefined(z.string().optional()),
-  city: emptyToUndefined(z.string().optional()),
-  department: emptyToUndefined(z.string().optional()),
+  taxId: z.string().trim().min(1, 'El NIT / DPI es requerido'),
+  email: z.string().trim().min(1, 'El correo electrónico es requerido').email('Ingresa un correo electrónico válido'),
+  phone: z.string().trim().min(8, 'El teléfono es requerido (mínimo 8 dígitos)'),
+  address: z.string().trim().min(1, 'La dirección es requerida'),
+  city: z.string().trim().min(1, 'La ciudad es requerida'),
+  department: z.string().trim().min(1, 'El departamento es requerido'),
 })
 
 type ClientFormData = z.infer<typeof clientSchema>
@@ -38,12 +37,14 @@ export function ClientsMaintenancePage() {
   const canManageClients = usePermission('manage_clients')
   const permissionsLoading = usePermissionLoading()
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
+  const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>(() => createEmptyGridSelectionModel())
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [selected, setSelected] = useState<ClientRaw | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const { data: policies } = useApiQuery('policies-for-clients-related', fetchPolicies)
   const [policiesDialogOpen, setPoliciesDialogOpen] = useState(false)
@@ -52,6 +53,11 @@ export function ClientsMaintenancePage() {
     if (!selected) return []
     return (policies ?? []).filter((p) => p.clientUuid === selected.uuid || p.client?.uuid === selected.uuid)
   }, [policies, selected])
+  const selectedIds = useMemo(
+    () => getSelectedGridIds(rowSelectionModel, (clients ?? []).map((client) => client.uuid)),
+    [clients, rowSelectionModel],
+  )
+  const selectedCount = selectedIds.length
 
   const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
@@ -125,6 +131,22 @@ export function ClientsMaintenancePage() {
       refetch()
     } catch {
       toast.error('Error al eliminar el cliente')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    setIsDeleting(true)
+    try {
+      await Promise.all(selectedIds.map((uuid) => removeClient(uuid)))
+      toast.success(`${selectedIds.length} clientes eliminados`)
+      setBulkDeleteDialogOpen(false)
+      setRowSelectionModel(createEmptyGridSelectionModel())
+      refetch()
+    } catch {
+      toast.error('Error al eliminar los clientes seleccionados')
     } finally {
       setIsDeleting(false)
     }
@@ -204,12 +226,6 @@ export function ClientsMaintenancePage() {
         <Box sx={{ flexGrow: 1 }}>
           <PageHeader title="Clientes" description="Personas, empresas, contactos y datos fiscales." actionLabel="" icon={UsersRound} />
         </Box>
-        {canManageClients && (
-          <Button variant="contained" startIcon={<Plus size={20} />} onClick={openCreate}
-            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
-            Nuevo cliente
-          </Button>
-        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de clientes.</Alert>}
@@ -219,6 +235,9 @@ export function ClientsMaintenancePage() {
         columns={columns}
         getRowId={(row) => row.uuid}
         loading={loading}
+        checkboxSelection={canManageClients}
+        rowSelectionModel={rowSelectionModel}
+        onRowSelectionModelChange={setRowSelectionModel}
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
         localeText={esESGrid}
@@ -242,17 +261,17 @@ export function ClientsMaintenancePage() {
           <DialogContent dividers sx={{ borderColor: 'divider' }}>
             <Stack spacing={3} sx={{ mt: 1 }}>
               <Controller name="displayName" control={control} render={({ field }) => (
-                <TextField {...field} label="Nombre Completo / Razón Social *" fullWidth error={!!errors.displayName} helperText={errors.displayName?.message ?? ' '} />
+                <TextField {...field} type="text" label="Nombre Completo / Razón Social *" fullWidth error={!!errors.displayName} helperText={errors.displayName?.message ?? ' '} />
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="type" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Tipo" fullWidth>
+                  <TextField {...field} select label="Tipo *" fullWidth error={!!errors.type} helperText={errors.type?.message ?? ' '}>
                     <MenuItem value="Individual">Persona Física</MenuItem>
                     <MenuItem value="Company">Empresa</MenuItem>
                   </TextField>
                 )} />
                 <Controller name="status" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Estado" fullWidth>
+                  <TextField {...field} select label="Estado *" fullWidth error={!!errors.status} helperText={errors.status?.message ?? ' '}>
                     <MenuItem value="Active">Activo</MenuItem>
                     <MenuItem value="Inactive">Inactivo</MenuItem>
                     <MenuItem value="Prospect">Prospecto</MenuItem>
@@ -260,25 +279,25 @@ export function ClientsMaintenancePage() {
                 )} />
               </Stack>
               <Controller name="taxId" control={control} render={({ field }) => (
-                <TextField {...field} label="NIT / DPI" fullWidth error={!!errors.taxId} helperText={errors.taxId?.message?.toString() ?? ' '} />
+                <TextField {...field} type="text" label="NIT / DPI *" fullWidth error={!!errors.taxId} helperText={errors.taxId?.message ?? ' '} />
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="email" control={control} render={({ field }) => (
-                  <TextField {...field} label="Email" fullWidth error={!!errors.email} helperText={errors.email?.message?.toString() ?? ' '} />
+                  <TextField {...field} type="email" label="Email *" fullWidth error={!!errors.email} helperText={errors.email?.message ?? ' '} />
                 )} />
                 <Controller name="phone" control={control} render={({ field }) => (
-                  <TextField {...field} label="Teléfono" fullWidth error={!!errors.phone} helperText={errors.phone?.message?.toString() ?? ' '} />
+                  <TextField {...field} type="tel" label="Teléfono *" fullWidth error={!!errors.phone} helperText={errors.phone?.message ?? ' '} />
                 )} />
               </Stack>
               <Controller name="address" control={control} render={({ field }) => (
-                <TextField {...field} label="Dirección" fullWidth error={!!errors.address} helperText={errors.address?.message?.toString() ?? ' '} />
+                <TextField {...field} type="text" label="Dirección *" fullWidth error={!!errors.address} helperText={errors.address?.message ?? ' '} />
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="city" control={control} render={({ field }) => (
-                  <TextField {...field} label="Ciudad" fullWidth error={!!errors.city} helperText={errors.city?.message?.toString() ?? ' '} />
+                  <TextField {...field} type="text" label="Ciudad *" fullWidth error={!!errors.city} helperText={errors.city?.message ?? ' '} />
                 )} />
                 <Controller name="department" control={control} render={({ field }) => (
-                  <TextField {...field} label="Departamento" fullWidth error={!!errors.department} helperText={errors.department?.message?.toString() ?? ' '} />
+                  <TextField {...field} type="text" label="Departamento *" fullWidth error={!!errors.department} helperText={errors.department?.message ?? ' '} />
                 )} />
               </Stack>
             </Stack>
@@ -321,77 +340,200 @@ export function ClientsMaintenancePage() {
         </DialogActions>
       </Dialog>
 
-      {/* Policies Dialog */}
-      <Dialog open={policiesDialogOpen} onClose={() => setPoliciesDialogOpen(false)} maxWidth="md" fullWidth slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
+      <Dialog open={bulkDeleteDialogOpen} onClose={() => !isDeleting && setBulkDeleteDialogOpen(false)} slotProps={{ paper: { sx: { borderRadius: 3, maxWidth: 420 } } }}>
         <DialogTitle sx={{ fontWeight: 700, color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Shield size={20} color="var(--mui-palette-primary-main)" />
-          Pólizas contratadas — {selected?.displayName}
+          <Trash2 size={20} color="var(--mui-palette-error-main)" /> Eliminar clientes
         </DialogTitle>
-        <DialogContent dividers sx={{ borderColor: 'divider' }}>
+        <DialogContent>
+          <Typography sx={{ color: 'text.primary', mt: 1 }}>
+            ¿Eliminar <strong>{selectedCount}</strong> clientes seleccionados? Esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button onClick={() => setBulkDeleteDialogOpen(false)} disabled={isDeleting} sx={{ color: 'text.secondary' }}>Cancelar</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={isDeleting}
+            onClick={handleBulkDelete}
+            startIcon={isDeleting ? <CircularProgress size={16} color="inherit" /> : <Trash2 size={16} />}
+          >
+            {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Policies Dialog */}
+      <Dialog open={policiesDialogOpen} onClose={() => setPoliciesDialogOpen(false)} maxWidth="md" fullWidth slotProps={{ paper: { sx: { borderRadius: 3, backgroundImage: 'none' } } }}>
+        <DialogTitle sx={{ fontWeight: 800, color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1.5, pt: 3, pb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 2.5, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1), color: 'primary.main' }}>
+            <Shield size={22} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>Pólizas Contratadas</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>Cliente: {selected?.displayName}</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers sx={{ borderColor: 'divider', px: { xs: 2, sm: 3 }, py: 3 }}>
           {clientPolicies.length === 0 ? (
-            <Box sx={{ py: 6, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-              <FileText size={48} style={{ opacity: 0.3 }} />
-              <Typography color="text.secondary">Este cliente no posee pólizas contratadas actualmente.</Typography>
+            <Box sx={{ py: 8, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <FileText size={48} style={{ opacity: 0.2 }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }} color="text.secondary">Sin pólizas registradas</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 300 }}>Este cliente no posee pólizas contratadas actualmente en el sistema.</Typography>
             </Box>
           ) : (
-            <ResponsiveDataGrid
-              rows={clientPolicies}
-              columns={[
-                { field: 'policyNumber', headerName: 'Nº Póliza', width: 140 },
-                { field: 'product', headerName: 'Producto', flex: 1, minWidth: 140, valueGetter: (_v, row) => row.product?.name ?? '—' },
-                { field: 'provider', headerName: 'Proveedor', flex: 1, minWidth: 140, valueGetter: (_v, row) => row.provider?.name ?? '—' },
-                {
-                  field: 'dates',
-                  headerName: 'Vigencia',
-                  width: 200,
-                  valueGetter: (_v, row) => {
-                    const start = row.startDate ? new Date(row.startDate).toLocaleDateString('es-GT') : '—'
-                    const end = row.endDate ? new Date(row.endDate).toLocaleDateString('es-GT') : '—'
-                    return `${start} al ${end}`
-                  }
-                },
-                {
-                  field: 'premiumAmount',
-                  headerName: 'Prima',
-                  width: 130,
-                  renderCell: (params) => {
-                    if (params.row.premiumAmount == null) return '—'
-                    const currency = params.row.currency ?? 'USD'
-                    let symbol = '$'
-                    if (currency === 'GTQ') symbol = 'Q'
-                    else if (currency === 'EUR') symbol = '€'
-                    else if (currency !== 'USD') symbol = `${currency} `
-                    return `${symbol}${Number(params.row.premiumAmount).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`
-                  }
-                },
-                {
-                  field: 'status',
-                  headerName: 'Estado',
-                  width: 120,
-                  renderCell: (params) => {
-                    let label = params.row.status
-                    let color: any = 'default'
-                    if (params.row.status === 'Active') { label = 'Vigente'; color = 'success' }
-                    else if (params.row.status === 'PendingRenewal') { label = 'Pendiente Renovación'; color = 'warning' }
-                    else if (params.row.status === 'Expired') { label = 'Vencida'; color = 'error' }
-                    else if (params.row.status === 'Cancelled') { label = 'Cancelada'; color = 'error' }
-                    else if (params.row.status === 'Draft') { label = 'Borrador'; color = 'default' }
-                    return <Chip label={label} size="small" color={color} variant="outlined" sx={{ fontWeight: 600 }} />
-                  }
-                }
-              ]}
-              getRowId={(row) => row.uuid}
-              paginationModel={{ page: 0, pageSize: 5 }}
-              localeText={esESGrid}
-            />
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                gap: 2.5,
+                maxHeight: '60vh',
+                overflowY: 'auto',
+                pr: { xs: 0.5, sm: 1 },
+                py: 0.5,
+                // Custom scrollbar
+                '&::-webkit-scrollbar': { width: 6 },
+                '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+                '&::-webkit-scrollbar-thumb': { bgcolor: (theme) => alpha(theme.palette.text.secondary, 0.15), borderRadius: 3 }
+              }}
+            >
+              {clientPolicies.map((policy) => {
+                const start = policy.startDate ? new Date(policy.startDate).toLocaleDateString('es-GT') : '—'
+                const end = policy.endDate ? new Date(policy.endDate).toLocaleDateString('es-GT') : '—'
+                
+                const currency = policy.currency ?? 'USD'
+                let symbol = '$'
+                if (currency === 'GTQ') symbol = 'Q'
+                else if (currency === 'EUR') symbol = '€'
+                else if (currency !== 'USD') symbol = `${currency} `
+                const formattedPremium = policy.premiumAmount != null
+                  ? `${symbol}${Number(policy.premiumAmount).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`
+                  : '—'
+
+                let statusLabel = policy.status
+                let statusColor: any = 'default'
+                if (policy.status === 'Active' || policy.status === 'active') { statusLabel = 'Vigente'; statusColor = 'success' }
+                else if (policy.status === 'PendingRenewal') { statusLabel = 'Pendiente Renovación'; statusColor = 'warning' }
+                else if (policy.status === 'Expired') { statusLabel = 'Vencida'; statusColor = 'error' }
+                else if (policy.status === 'Cancelled') { statusLabel = 'Cancelada'; statusColor = 'error' }
+                else if (policy.status === 'Draft') { statusLabel = 'Borrador'; statusColor = 'default' }
+
+                return (
+                  <Box
+                    key={policy.uuid}
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 3,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderLeft: '4px solid',
+                      borderLeftColor: `${statusColor}.main`,
+                      bgcolor: 'background.paper',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      '&:hover': {
+                        borderColor: 'divider',
+                        borderLeftColor: `${statusColor}.main`,
+                        transform: 'translateY(-2px)',
+                        boxShadow: (theme) => theme.palette.mode === 'light'
+                          ? '0 12px 20px -8px rgba(15, 23, 42, 0.08)'
+                          : '0 12px 20px -8px rgba(0, 0, 0, 0.4)',
+                      }
+                    }}
+                  >
+                    {/* Header: Policy Number & Status */}
+                    <Box sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.25 }}>
+                          Nº Póliza
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.01em' }}>
+                          {policy.policyNumber}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={statusLabel}
+                        size="small"
+                        color={statusColor}
+                        sx={{ fontWeight: 700, fontSize: '0.75rem', borderRadius: 1.5 }}
+                      />
+                    </Box>
+
+                    <Stack spacing={1.5} sx={{ pt: 2, borderTop: '1px solid', borderColor: (theme) => alpha(theme.palette.divider, 0.5) }}>
+                      {/* Product Name */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 1, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06), color: 'primary.main', flexShrink: 0 }}>
+                          <FileText size={14} />
+                        </Box>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1 }}>Producto</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {policy.product?.name ?? '—'}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Provider Name */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 1, bgcolor: (theme) => alpha(theme.palette.secondary.main, 0.06), color: 'secondary.main', flexShrink: 0 }}>
+                          <Building2 size={14} />
+                        </Box>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1 }}>Aseguradora</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {policy.provider?.name ?? '—'}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Row for dates & cost */}
+                      <Box sx={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 2, pt: 1 }}>
+                        {/* Dates */}
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>Vigencia</Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Calendar size={13} style={{ opacity: 0.6 }} />
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                              {start} al {end}
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        {/* Cost */}
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>Prima Anual</Typography>
+                          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                            <CreditCard size={13} style={{ opacity: 0.6 }} />
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                              {formattedPremium}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                    </Stack>
+                  </Box>
+                )
+              })}
+            </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setPoliciesDialogOpen(false)} variant="contained">
+        <DialogActions sx={{ p: 3, bgcolor: (theme) => theme.palette.mode === 'light' ? '#fdfdfd' : 'transparent' }}>
+          <Button onClick={() => setPoliciesDialogOpen(false)} variant="outlined" sx={{ minWidth: 100, borderRadius: 2 }}>
             Cerrar
           </Button>
         </DialogActions>
       </Dialog>
+
+      {canManageClients && (
+        <MaintenanceFab
+          label={selectedCount > 0 ? `Eliminar ${selectedCount} clientes` : 'Nuevo cliente'}
+          onClick={selectedCount > 0 ? () => setBulkDeleteDialogOpen(true) : openCreate}
+          icon={selectedCount > 0 ? <Trash2 size={24} /> : undefined}
+          color={selectedCount > 0 ? 'error' : 'primary'}
+        />
+      )}
     </Stack>
   )
 }

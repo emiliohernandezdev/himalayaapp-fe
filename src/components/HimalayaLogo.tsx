@@ -6,17 +6,34 @@ type HimalayaLogoProps = SVGProps<SVGSVGElement> & {
 
 export function HimalayaLogo({ title = 'Himalaya', ...props }: HimalayaLogoProps) {
   return (
-    <svg viewBox="0 0 96 64" role="img" aria-label={title} {...props}>
+    <svg viewBox="0 0 112 76" role="img" aria-label={title} {...props}>
+      <defs>
+        <linearGradient id="himalaya-logo-main" x1="14" y1="66" x2="83" y2="6" gradientUnits="userSpaceOnUse">
+          <stop stopColor="currentColor" />
+          <stop offset="1" stopColor="var(--himalaya-accent)" />
+        </linearGradient>
+      </defs>
       <path
-        d="M9 54 35.4 13.5c1.2-1.8 3.9-1.8 5.1 0L66 54H9Z"
-        fill="#075985"
+        d="M12 60c17-31 46-49 88-46"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        opacity="0.22"
+      />
+      <circle cx="78" cy="18" r="8" fill="var(--himalaya-accent)" opacity="0.9" />
+      <path
+        d="M8 64 36 20c1.4-2.2 4.7-2.2 6.1 0L70 64H8Z"
+        fill="url(#himalaya-logo-main)"
+        opacity="0.9"
       />
       <path
-        d="M31.5 54 58.8 9.4c1.2-2 4.1-2 5.3 0L88 54H31.5Z"
-        fill="#0c4a6e"
+        d="M34 64 64 11c1.5-2.6 5.3-2.5 6.7.1L104 64H34Z"
+        fill="color-mix(in srgb, currentColor 70%, var(--himalaya-accent))"
       />
-      <path d="m35.8 20.5 7.5 11.4-6.7-2.7-6.8 7.3-3.6-4.2 9.6-11.8Z" fill="#e0f2fe" />
-      <path d="m59.8 16.9 8.6 14.2-7.8-3.3-8 8.3-3.5-4.6 10.7-14.6Z" fill="#bae6fd" />
+      <path d="m37 23 8 13-8-3-8 9-4-5 12-14Z" fill="var(--himalaya-surface)" opacity="0.95" />
+      <path d="m66 15 10 17-9-4-10 10-4-6 13-17Z" fill="var(--himalaya-surface)" opacity="0.9" />
+      <path d="M18 64h80" stroke="currentColor" strokeWidth="4" strokeLinecap="round" opacity="0.18" />
     </svg>
   )
 }
