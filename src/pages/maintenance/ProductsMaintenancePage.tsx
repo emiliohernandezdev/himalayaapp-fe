@@ -16,6 +16,8 @@ import { esESGrid, productCategoryLabels, productStatusLabels, t } from '../../u
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 import { MaintenanceFab } from '../../components/MaintenanceFab'
 import { createEmptyGridSelectionModel, getSelectedGridIds } from '../../utils/gridSelection'
+import { ResponsiveSelect } from '../../components/ResponsiveSelect'
+import { ResponsiveAutocomplete } from '../../components/ResponsiveAutocomplete'
 
 const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((val) => (val === '' ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
@@ -47,9 +49,14 @@ export function ProductsMaintenancePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [providerFilterUuid, setProviderFilterUuid] = useState('')
+  const filteredProducts = useMemo(
+    () => (products ?? []).filter((product) => !providerFilterUuid || product.providerUuid === providerFilterUuid),
+    [products, providerFilterUuid],
+  )
   const selectedIds = useMemo(
-    () => getSelectedGridIds(rowSelectionModel, (products ?? []).map((product) => product.uuid)),
-    [products, rowSelectionModel],
+    () => getSelectedGridIds(rowSelectionModel, filteredProducts.map((product) => product.uuid)),
+    [filteredProducts, rowSelectionModel],
   )
   const selectedCount = selectedIds.length
 
@@ -194,9 +201,33 @@ export function ProductsMaintenancePage() {
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>No se pudo cargar la información de productos.</Alert>}
 
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}>
+        <Box sx={{ maxWidth: { sm: 420 }, width: '100%' }}>
+          <ResponsiveAutocomplete
+            options={providers ?? []}
+            getOptionLabel={(option: ProviderRaw) => option.name}
+            value={(providers ?? []).find((provider) => provider.uuid === providerFilterUuid) ?? null}
+            onChange={(_, value) => {
+              setProviderFilterUuid(value?.uuid ?? '')
+              setPaginationModel((current) => ({ ...current, page: 0 }))
+              setRowSelectionModel(createEmptyGridSelectionModel())
+            }}
+            isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
+            noOptionsText="Sin proveedores"
+            label="Filtrar por proveedor"
+            placeholder="Todos los proveedores"
+          />
+        </Box>
+        {providerFilterUuid && (
+          <Button variant="outlined" onClick={() => setProviderFilterUuid('')} sx={{ minHeight: 52, borderRadius: 2 }}>
+            Limpiar filtro
+          </Button>
+        )}
+      </Stack>
+
       <ResponsiveDataGrid
         height={580}
-        rows={products ?? []}
+        rows={filteredProducts}
         columns={columns}
         getRowId={(row) => row.uuid}
         loading={loading}
@@ -238,37 +269,46 @@ export function ProductsMaintenancePage() {
                 />
               )} />
 
-              <Controller name="providerUuid" control={control} render={({ field }) => (
-                <TextField
-                  {...field}
-                  select
+               <Controller name="providerUuid" control={control} render={({ field }) => (
+                <ResponsiveAutocomplete
+                  options={providers ?? []}
+                  getOptionLabel={(option: ProviderRaw) => option.name}
+                  value={(providers ?? []).find((provider) => provider.uuid === field.value) ?? null}
+                  onChange={(_, value) => field.onChange(value?.uuid ?? '')}
+                  isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
+                  noOptionsText="Sin proveedores"
                   label="Proveedor *"
-                  fullWidth
                   error={!!errors.providerUuid}
                   helperText={errors.providerUuid?.message ?? ' '}
-                >
-                  <MenuItem value="" disabled>Selecciona un proveedor</MenuItem>
-                  {(providers ?? []).map((p: ProviderRaw) => (
-                    <MenuItem key={p.uuid} value={p.uuid}>{p.name}</MenuItem>
-                  ))}
-                </TextField>
+                />
               )} />
 
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Controller name="category" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Categoría *" fullWidth error={!!errors.category} helperText={errors.category?.message ?? ' '}>
-                    <MenuItem value="Insurance">Seguros</MenuItem>
-                    <MenuItem value="SuretyBond">Fianzas</MenuItem>
-                    <MenuItem value="Assistance">Asistencias</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Categoría *"
+                    error={!!errors.category}
+                    helperText={errors.category?.message ?? ' '}
+                    options={[
+                      { value: 'Insurance', label: 'Seguros' },
+                      { value: 'SuretyBond', label: 'Fianzas' },
+                      { value: 'Assistance', label: 'Asistencias' }
+                    ]}
+                  />
                 )} />
 
                 <Controller name="status" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Estado" fullWidth helperText=" ">
-                    <MenuItem value="Active">Activo</MenuItem>
-                    <MenuItem value="Inactive">Inactivo</MenuItem>
-                    <MenuItem value="Draft">Borrador</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Estado"
+                    helperText=" "
+                    options={[
+                      { value: 'Active', label: 'Activo' },
+                      { value: 'Inactive', label: 'Inactivo' },
+                      { value: 'Draft', label: 'Borrador' }
+                    ]}
+                  />
                 )} />
               </Stack>
 

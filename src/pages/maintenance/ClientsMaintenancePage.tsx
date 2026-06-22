@@ -16,6 +16,7 @@ import { clientStatusLabels, clientTypeLabels, esESGrid, t } from '../../utils/e
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 import { MaintenanceFab } from '../../components/MaintenanceFab'
 import { createEmptyGridSelectionModel, getSelectedGridIds } from '../../utils/gridSelection'
+import { ResponsiveSelect } from '../../components/ResponsiveSelect'
 
 const clientSchema = z.object({
   displayName: z.string().trim().min(2, 'El nombre completo / razón social es requerido (mínimo 2 caracteres)'),
@@ -240,7 +241,12 @@ export function ClientsMaintenancePage() {
         onRowSelectionModelChange={setRowSelectionModel}
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
+        onRowClick={(params) => {
+          setSelected(params.row)
+          setPoliciesDialogOpen(true)
+        }}
         localeText={esESGrid}
+        sx={{ cursor: 'pointer', '& .MuiDataGrid-row:hover': { bgcolor: 'action.hover' } }}
       />
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
@@ -265,17 +271,29 @@ export function ClientsMaintenancePage() {
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="type" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Tipo *" fullWidth error={!!errors.type} helperText={errors.type?.message ?? ' '}>
-                    <MenuItem value="Individual">Persona Física</MenuItem>
-                    <MenuItem value="Company">Empresa</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Tipo *"
+                    error={!!errors.type}
+                    helperText={errors.type?.message ?? ' '}
+                    options={[
+                      { value: 'Individual', label: 'Persona Física' },
+                      { value: 'Company', label: 'Empresa' }
+                    ]}
+                  />
                 )} />
                 <Controller name="status" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Estado *" fullWidth error={!!errors.status} helperText={errors.status?.message ?? ' '}>
-                    <MenuItem value="Active">Activo</MenuItem>
-                    <MenuItem value="Inactive">Inactivo</MenuItem>
-                    <MenuItem value="Prospect">Prospecto</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Estado *"
+                    error={!!errors.status}
+                    helperText={errors.status?.message ?? ' '}
+                    options={[
+                      { value: 'Active', label: 'Activo' },
+                      { value: 'Inactive', label: 'Inactivo' },
+                      { value: 'Prospect', label: 'Prospecto' }
+                    ]}
+                  />
                 )} />
               </Stack>
               <Controller name="taxId" control={control} render={({ field }) => (

@@ -8,15 +8,11 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControl,
   FormControlLabel,
-  FormHelperText,
   IconButton,
-  InputLabel,
   Menu,
   MenuItem,
   Pagination,
-  Select,
   Stack,
   Switch,
   TextField,
@@ -35,6 +31,7 @@ import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 import { MaintenanceFab } from '../../components/MaintenanceFab'
 import { WidgetIconPreview } from '../../components/WidgetIconPreview'
+import { ResponsiveSelect } from '../../components/ResponsiveSelect'
 
 const categories = ['Métricas', 'Operación', 'Análisis', 'Seguridad']
 const presentationTypes = [
@@ -425,49 +422,33 @@ export function WidgetsMaintenancePage() {
               />
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormControl fullWidth error={!!errors.category}>
-                  <InputLabel id="category-select-label">Categoría</InputLabel>
-                  <Controller
-                    name="category"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        {...field}
-                        labelId="category-select-label"
-                        label="Categoría"
-                      >
-                        {categories.map((cat) => (
-                          <MenuItem key={cat} value={cat}>
-                            {cat}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    )}
-                  />
-                  {errors.category && <FormHelperText>{errors.category.message}</FormHelperText>}
-                </FormControl>
+                <Controller
+                  name="category"
+                  control={control}
+                  render={({ field }) => (
+                    <ResponsiveSelect
+                      {...field}
+                      label="Categoría *"
+                      error={!!errors.category}
+                      helperText={errors.category?.message ?? ' '}
+                      options={categories.map((cat) => ({ value: cat, label: cat }))}
+                    />
+                  )}
+                />
 
-                <FormControl fullWidth error={!!errors.presentationType}>
-                  <InputLabel id="type-select-label">Formato</InputLabel>
-                  <Controller
-                    name="presentationType"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        {...field}
-                        labelId="type-select-label"
-                        label="Formato"
-                      >
-                        {presentationTypes.map((type) => (
-                          <MenuItem key={type} value={type}>
-                            {type}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    )}
-                  />
-                  {errors.presentationType && <FormHelperText>{errors.presentationType.message}</FormHelperText>}
-                </FormControl>
+                <Controller
+                  name="presentationType"
+                  control={control}
+                  render={({ field }) => (
+                    <ResponsiveSelect
+                      {...field}
+                      label="Formato *"
+                      error={!!errors.presentationType}
+                      helperText={errors.presentationType?.message ?? ' '}
+                      options={presentationTypes.map((type) => ({ value: type, label: type }))}
+                    />
+                  )}
+                />
 
                 <Controller
                   name="icon"

@@ -1,18 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Pagination, Stack, TextField, Typography } from '@mui/material'
-import { Building2, Edit2, MoreVertical, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { Building2, Edit2, Mail, MoreVertical, PackageCheck, Phone, Trash2, User, MapPin, ExternalLink, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
-import { createProvider, fetchProviders, removeProvider, updateProvider } from '../../api/maintenanceApi'
-import type { ProviderRaw } from '../../api/maintenanceApi'
+import { createProvider, fetchProducts, fetchProviders, removeProvider, updateProvider } from '../../api/maintenanceApi'
+import type { ProductRaw, ProviderRaw } from '../../api/maintenanceApi'
 import { useApiQuery } from '../../api/useApiQuery'
 import { PageHeader } from '../../components/PageHeader'
 import { usePermission, usePermissionLoading } from '../../hooks/usePermission'
-import { providerStatusLabels, providerTypeLabels, t } from '../../utils/enumLabels'
+import { providerStatusLabels, providerTypeLabels, productCategoryLabels, productStatusLabels, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 import { MaintenanceFab } from '../../components/MaintenanceFab'
+import { ResponsiveSelect } from '../../components/ResponsiveSelect'
 
 const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((val) => (val === '' ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
@@ -45,6 +46,7 @@ function providerAvatarColor(name: string) {
 
 export function ProvidersMaintenancePage() {
   const { data: records, error, loading, refetch } = useApiQuery('providers', fetchProviders)
+  const { data: products } = useApiQuery('products-for-provider-detail', fetchProducts)
   const canViewProviders = usePermission('view_providers')
   const canManageProviders = usePermission('manage_providers')
   const permissionsLoading = usePermissionLoading()
@@ -59,8 +61,13 @@ export function ProvidersMaintenancePage() {
   const [selected, setSelected] = useState<ProviderRaw | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
+  const [detailOpen, setDetailOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const selectedProducts = useMemo<ProductRaw[]>(
+    () => selected ? (products ?? []).filter((product) => product.providerUuid === selected.uuid || product.provider?.uuid === selected.uuid) : [],
+    [products, selected],
+  )
 
   const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProviderFormData>({
     resolver: zodResolver(providerSchema),
@@ -95,6 +102,11 @@ export function ProvidersMaintenancePage() {
     if (!selected) return
     setDeleteDialogOpen(true)
     setAnchorEl(null)
+  }
+
+  const openDetail = (provider: ProviderRaw) => {
+    setSelected(provider)
+    setDetailOpen(true)
   }
 
   const onSubmit = async (data: any) => {
@@ -164,75 +176,155 @@ export function ProvidersMaintenancePage() {
               <Box key={i} sx={{ height: 160, borderRadius: 3, bgcolor: 'var(--himalaya-surface-soft)', border: '1px solid', borderColor: 'divider', animation: 'himalaya-skeleton-pulse 1.8s ease-in-out infinite' }} />
             ))
           : paginatedProviders.map((provider) => (
-              <Box key={provider.uuid} sx={{
-                display: 'flex', flexDirection: 'column',
-                position: 'relative',
-                overflow: 'hidden',
-                bgcolor: 'background.paper', borderRadius: 4,
-                border: '1px solid', borderColor: 'divider',
-                p: 3, boxShadow: 'var(--himalaya-shadow)',
-                transition: 'all 0.2s ease-in-out',
-                minHeight: 190,
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--himalaya-primary) 16%, transparent), transparent 34%)',
-                  pointerEvents: 'none',
-                },
-                '&:hover': { transform: 'translateY(-4px)', borderColor: 'primary.main', boxShadow: '0 24px 60px rgba(7,89,133,0.18)' }
-              }}>
-                <Stack direction="row" sx={{ position: 'relative', zIndex: 1, justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+              <Box
+                key={provider.uuid}
+                role="button"
+                tabIndex={0}
+                onClick={() => openDetail(provider)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    openDetail(provider)
+                  }
+                }}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  bgcolor: 'background.paper',
+                  borderRadius: 4,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  p: 3,
+                  boxShadow: 'var(--himalaya-shadow)',
+                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  cursor: 'pointer',
+                  minHeight: 250,
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--himalaya-primary) 8%, transparent), transparent 40%)',
+                    pointerEvents: 'none',
+                  },
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    borderColor: 'primary.main',
+                    boxShadow: (theme) => theme.palette.mode === 'light'
+                      ? '0 20px 40px -10px rgba(7, 89, 133, 0.12)'
+                      : '0 20px 40px -10px rgba(0, 0, 0, 0.5)',
+                  },
+                  '&:focus-visible': { outline: '3px solid', outlineColor: 'primary.main', outlineOffset: 3 },
+                }}
+              >
+                {/* Header: Logo, Status, Type, Actions */}
+                <Stack direction="row" sx={{ position: 'relative', zIndex: 1, justifyContent: 'space-between', alignItems: 'flex-start', mb: 2.5 }}>
                   <Avatar
                     src={provider.logo || undefined}
                     alt={provider.name}
                     slotProps={{ img: { referrerPolicy: 'no-referrer' } }}
                     sx={{
-                      width: 64,
-                      height: 64,
+                      width: 52,
+                      height: 52,
                       fontWeight: 900,
-                      fontSize: '1.05rem',
+                      fontSize: '0.95rem',
                       bgcolor: providerAvatarColor(provider.name),
                       color: '#fff',
-                      border: '3px solid',
+                      border: '2px solid',
                       borderColor: 'background.paper',
-                      boxShadow: '0 14px 30px rgba(15,23,42,0.18)',
+                      boxShadow: '0 8px 20px rgba(15,23,42,0.12)',
                     }}
                   >
                     {providerInitials(provider.name)}
                   </Avatar>
-                  {canManageProviders && (
-                    <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelected(provider) }} sx={{ color: 'text.secondary', mr: -1, mt: -1 }}>
-                      <MoreVertical size={18} />
-                    </IconButton>
-                  )}
+                  
+                  <Stack direction="column" spacing={0.75} sx={{ alignItems: 'flex-end' }}>
+                    <Chip
+                      label={t(providerStatusLabels, provider.status)}
+                      size="small"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: '0.72rem',
+                        height: 22,
+                        bgcolor: provider.status === 'Active' ? 'success.main' : provider.status === 'UnderReview' ? 'warning.main' : 'action.disabledBackground',
+                        color: provider.status === 'Active' ? 'success.contrastText' : provider.status === 'UnderReview' ? 'warning.contrastText' : 'text.secondary',
+                      }}
+                    />
+                    <Chip
+                      label={t(providerTypeLabels, provider.type)}
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        fontWeight: 650,
+                        fontSize: '0.7rem',
+                        height: 20,
+                        borderColor: 'divider',
+                        color: 'text.secondary',
+                      }}
+                    />
+                  </Stack>
                 </Stack>
 
-                <Box sx={{ position: 'relative', zIndex: 1, flexGrow: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.2, mb: 0.5 }}>
+                {/* Body: Name */}
+                <Box sx={{ position: 'relative', zIndex: 1, flexGrow: 1, mb: 2 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.25, mb: 1, letterSpacing: '-0.015em' }}>
                     {provider.name}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    {t(providerTypeLabels, provider.type)}
-                  </Typography>
-                  {provider.contactName && (
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
-                      {provider.contactName}
-                    </Typography>
+                  {canManageProviders && (
+                    <IconButton 
+                      size="small" 
+                      onClick={(e) => { 
+                        e.stopPropagation()
+                        setAnchorEl(e.currentTarget)
+                        setSelected(provider)
+                      }} 
+                      sx={{ 
+                        position: 'absolute', 
+                        right: 0, 
+                        top: 0, 
+                        color: 'text.secondary',
+                        bgcolor: 'action.hover',
+                        opacity: 0,
+                        transition: 'opacity 0.2s',
+                        '.MuiBox-root:hover &': { opacity: 1 } // Show on hover if possible
+                      }}
+                    >
+                      <MoreVertical size={16} />
+                    </IconButton>
                   )}
                 </Box>
 
-                <Box sx={{ position: 'relative', zIndex: 1, mt: 2 }}>
-                  <Chip
-                    label={t(providerStatusLabels, provider.status)}
-                    size="small"
-                    sx={{
-                      fontWeight: 600,
-                      bgcolor: provider.status === 'Active' ? 'success.main' : provider.status === 'UnderReview' ? 'warning.main' : 'action.disabledBackground',
-                      color: provider.status === 'Active' ? 'success.contrastText' : provider.status === 'UnderReview' ? 'warning.contrastText' : 'text.secondary',
-                    }}
-                  />
-                </Box>
+                {/* Footer: Contact Block (Clearly Identifiable) */}
+                {provider.contactName && (
+                  <Box sx={{
+                    position: 'relative',
+                    zIndex: 1,
+                    pt: 2,
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                  }}>
+                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
+                      Contacto Comercial
+                    </Typography>
+                    <Stack spacing={0.75}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <User size={13} className="text-slate-400 dark:text-slate-500" />
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                          {provider.contactName}
+                        </Typography>
+                      </Stack>
+                      {provider.contactEmail && (
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                          <Mail size={12} className="text-slate-400 dark:text-slate-500" />
+                          <Typography variant="caption" color="text.secondary" sx={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {provider.contactEmail}
+                          </Typography>
+                        </Stack>
+                      )}
+                    </Stack>
+                  </Box>
+                )}
               </Box>
             ))}
       </Box>
@@ -245,6 +337,9 @@ export function ProvidersMaintenancePage() {
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
         slotProps={{ paper: { elevation: 0, sx: { borderRadius: 3, minWidth: 140, border: '1px solid', borderColor: 'divider', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } } }}>
+        <MenuItem onClick={() => { setDetailOpen(true); setAnchorEl(null) }} sx={{ color: 'primary.main' }}>
+          <PackageCheck size={16} className="mr-2" style={{ opacity: 0.7 }} /> Ver detalle
+        </MenuItem>
         <MenuItem onClick={openEdit} sx={{ color: 'text.primary' }}>
           <Edit2 size={16} className="mr-2" style={{ opacity: 0.7 }} /> Editar
         </MenuItem>
@@ -252,6 +347,324 @@ export function ProvidersMaintenancePage() {
           <Trash2 size={16} className="mr-2" /> Eliminar
         </MenuItem>
       </Menu>
+
+      <Dialog
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        maxWidth="md"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 4,
+              overflow: 'hidden',
+              boxShadow: '0 24px 70px rgba(0,0,0,0.15)',
+            }
+          }
+        }}
+      >
+        {/* Banner header */}
+        <Box sx={{
+          height: 120,
+          background: 'linear-gradient(135deg, var(--himalaya-primary-dark) 0%, var(--himalaya-primary) 100%)',
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'flex-end',
+          p: 3,
+        }}>
+          <IconButton 
+            onClick={() => setDetailOpen(false)} 
+            sx={{ 
+              position: 'absolute', 
+              top: 16, 
+              right: 16, 
+              color: '#fff', 
+              bgcolor: 'rgba(255,255,255,0.15)', 
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' } 
+            }}
+          >
+            <X size={18} />
+          </IconButton>
+        </Box>
+
+        <DialogContent sx={{ px: { xs: 2.5, sm: 4 }, pb: 4, pt: 0, mt: -6, position: 'relative', zIndex: 1 }}>
+          <Stack spacing={4}>
+            {/* Header info */}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} sx={{ alignItems: { xs: 'flex-start', sm: 'flex-end' }, mb: 2 }}>
+              <Avatar
+                src={selected?.logo || undefined}
+                alt={selected?.name}
+                sx={{
+                  width: 96,
+                  height: 96,
+                  bgcolor: selected ? providerAvatarColor(selected.name) : 'primary.main',
+                  color: '#fff',
+                  fontSize: '2rem',
+                  fontWeight: 900,
+                  border: '5px solid',
+                  borderColor: 'background.paper',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                }}
+              >
+                {selected ? providerInitials(selected.name) : 'PR'}
+              </Avatar>
+
+              <Box sx={{ flexGrow: 1, pb: 0.5 }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.75 }}>
+                  <Chip
+                    label={selected ? t(providerStatusLabels, selected.status) : ''}
+                    size="small"
+                    sx={{
+                      fontWeight: 700,
+                      bgcolor: selected?.status === 'Active' ? 'success.main' : selected?.status === 'UnderReview' ? 'warning.main' : 'action.disabledBackground',
+                      color: selected?.status === 'Active' ? 'success.contrastText' : selected?.status === 'UnderReview' ? 'warning.contrastText' : 'text.secondary',
+                    }}
+                  />
+                  <Chip
+                    label={selected ? t(providerTypeLabels, selected.type) : ''}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontWeight: 650 }}
+                  />
+                </Stack>
+                <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: '-0.02em', color: 'text.primary', lineHeight: 1.15 }}>
+                  {selected?.name}
+                </Typography>
+              </Box>
+            </Stack>
+
+            {/* Split Grid */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '4.5fr 7.5fr' }, gap: 4 }}>
+              
+              {/* Left Column: Commercial & Contact Details */}
+              <Stack spacing={3}>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'text.secondary', mb: 2 }}>
+                    Datos del Proveedor
+                  </Typography>
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
+                        IDENTIFICACIÓN TRIBUTARIA (NIT/RFC)
+                      </Typography>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Building2 size={16} className="text-slate-400" />
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {selected?.taxId ?? 'Sin registro'}
+                        </Typography>
+                      </Stack>
+                    </Box>
+
+                    {selected?.address && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
+                          DIRECCIÓN FISCAL
+                        </Typography>
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+                          <MapPin size={16} className="text-slate-400 mt-0.5" />
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {selected.address}
+                            </Typography>
+                            <Button
+                              component="a"
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selected.address)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              size="small"
+                              startIcon={<ExternalLink size={12} />}
+                              sx={{ p: 0, minWidth: 0, textTransform: 'none', fontWeight: 600, mt: 0.5 }}
+                            >
+                              Ver en mapa
+                            </Button>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    )}
+                  </Stack>
+                </Box>
+
+                <Box sx={{ p: 2.5, borderRadius: 3, border: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'text.secondary', mb: 2 }}>
+                    Contacto Comercial
+                  </Typography>
+                  {selected?.contactName ? (
+                    <Stack spacing={2}>
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                        <User size={18} className="text-slate-400" />
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+                            NOMBRE
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {selected.contactName}
+                          </Typography>
+                        </Box>
+                      </Stack>
+
+                      {selected.contactEmail && (
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                          <Mail size={18} className="text-slate-400" />
+                          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+                              CORREO ELECTRÓNICO
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {selected.contactEmail}
+                            </Typography>
+                            <Button
+                              component="a"
+                              href={`mailto:${selected.contactEmail}`}
+                              size="small"
+                              variant="outlined"
+                              sx={{ mt: 1, textTransform: 'none', height: 26, fontSize: '0.75rem', borderRadius: 1.5 }}
+                            >
+                              Enviar correo
+                            </Button>
+                          </Box>
+                        </Stack>
+                      )}
+
+                      {selected.contactPhone && (
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                          <Phone size={18} className="text-slate-400" />
+                          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+                              TELÉFONO
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                              {selected.contactPhone}
+                            </Typography>
+                            <Button
+                              component="a"
+                              href={`tel:${selected.contactPhone}`}
+                              size="small"
+                              variant="outlined"
+                              sx={{ mt: 1, textTransform: 'none', height: 26, fontSize: '0.75rem', borderRadius: 1.5 }}
+                            >
+                              Llamar
+                            </Button>
+                          </Box>
+                        </Stack>
+                      )}
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                      Sin información de contacto.
+                    </Typography>
+                  )}
+                </Box>
+              </Stack>
+
+              {/* Right Column: Products List */}
+              <Box>
+                <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'text.secondary' }}>
+                    Productos Ofrecidos ({selectedProducts.length})
+                  </Typography>
+                </Stack>
+
+                {selectedProducts.length === 0 ? (
+                  <Box sx={{
+                    py: 8,
+                    px: 3,
+                    textAlign: 'center',
+                    borderRadius: 4,
+                    border: '2px dashed',
+                    borderColor: 'divider',
+                    bgcolor: 'action.hover',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 1.5
+                  }}>
+                    <PackageCheck size={32} className="text-slate-300" />
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Este proveedor no tiene productos asociados en el catálogo.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, maxHeight: 420, overflowY: 'auto', pr: 0.5 }}>
+                    {selectedProducts.map((product) => (
+                      <Box
+                        key={product.uuid}
+                        sx={{
+                          p: 2.5,
+                          borderRadius: 3,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          bgcolor: 'background.paper',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                          transition: 'border-color 0.2s',
+                          '&:hover': { borderColor: 'primary.main' }
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary', mb: 0.5, lineHeight: 1.2 }}>
+                          {product.name}
+                        </Typography>
+                        
+                        <Stack spacing={1} sx={{ mt: 1.5 }}>
+                          <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                            <Chip
+                              size="small"
+                              label={t(productCategoryLabels, product.category)}
+                              sx={{
+                                fontWeight: 700,
+                                fontSize: '0.65rem',
+                                height: 18,
+                                bgcolor: 'primary.soft',
+                                color: 'primary.main'
+                              }}
+                            />
+                            {product.lineOfBusiness && (
+                              <Chip
+                                size="small"
+                                label={product.lineOfBusiness}
+                                variant="outlined"
+                                sx={{
+                                  fontWeight: 660,
+                                  fontSize: '0.65rem',
+                                  height: 18,
+                                  borderColor: 'divider'
+                                }}
+                              />
+                            )}
+                          </Stack>
+                          
+                          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mt: 0.5 }}>
+                            <Box sx={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: '50%',
+                              bgcolor: product.status === 'Active' ? 'success.main' : 'text.disabled'
+                            }} />
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650 }}>
+                              {t(productStatusLabels, product.status)}
+                            </Typography>
+                          </Stack>
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+
+            </Box>
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 3, gap: 1, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }}>
+          {canManageProviders && (
+            <Button variant="outlined" onClick={() => { setDetailOpen(false); openEdit() }} sx={{ borderRadius: 2 }}>
+              Editar
+            </Button>
+          )}
+          <Button variant="contained" onClick={() => setDetailOpen(false)} sx={{ borderRadius: 2, px: 3 }}>
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Form Dialog */}
       <Dialog open={dialogOpen} onClose={() => !isSubmitting && setDialogOpen(false)} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
@@ -266,18 +679,30 @@ export function ProvidersMaintenancePage() {
               )} />
               <Stack direction="row" spacing={2}>
                 <Controller name="type" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Tipo *" fullWidth error={!!errors.type} helperText={errors.type?.message ?? ' '}>
-                    <MenuItem value="InsuranceCompany">Aseguradora</MenuItem>
-                    <MenuItem value="SuretyCompany">Afianzadora</MenuItem>
-                    <MenuItem value="ServiceProvider">Proveedor de Servicios</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Tipo *"
+                    error={!!errors.type}
+                    helperText={errors.type?.message ?? ' '}
+                    options={[
+                      { value: 'InsuranceCompany', label: 'Aseguradora' },
+                      { value: 'SuretyCompany', label: 'Afianzadora' },
+                      { value: 'ServiceProvider', label: 'Proveedor de Servicios' }
+                    ]}
+                  />
                 )} />
                 <Controller name="status" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Estado *" fullWidth error={!!errors.status} helperText={errors.status?.message ?? ' '}>
-                    <MenuItem value="Active">Activo</MenuItem>
-                    <MenuItem value="Inactive">Inactivo</MenuItem>
-                    <MenuItem value="UnderReview">En revisión</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Estado *"
+                    error={!!errors.status}
+                    helperText={errors.status?.message ?? ' '}
+                    options={[
+                      { value: 'Active', label: 'Activo' },
+                      { value: 'Inactive', label: 'Inactivo' },
+                      { value: 'UnderReview', label: 'En revisión' }
+                    ]}
+                  />
                 )} />
               </Stack>
               <Controller name="contactName" control={control} render={({ field }) => (

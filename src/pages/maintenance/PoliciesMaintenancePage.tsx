@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, Tab, Tabs, TextField, Tooltip, Typography, useTheme } from '@mui/material'
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, Stack, Tab, Tabs, TextField, Tooltip, Typography, useTheme } from '@mui/material'
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
 import { Edit2, FileText, MoreVertical, Trash2, CreditCard, ArrowRightLeft, Banknote } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -18,6 +18,8 @@ import { esESGrid, policyStatusLabels, t } from '../../utils/enumLabels'
 import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 import { MaintenanceFab } from '../../components/MaintenanceFab'
 import { createEmptyGridSelectionModel, getSelectedGridIds } from '../../utils/gridSelection'
+import { ResponsiveSelect } from '../../components/ResponsiveSelect'
+import { ResponsiveAutocomplete } from '../../components/ResponsiveAutocomplete'
 
 const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((val) => (val === '' || val == null ? undefined : val), schema) as z.ZodType<z.infer<T> | undefined, any, any>
@@ -585,37 +587,38 @@ export function PoliciesMaintenancePage() {
                   <TextField {...field} type="text" label="Número de Póliza *" fullWidth error={!!errors.policyNumber} helperText={errors.policyNumber?.message ?? ' '} />
                 )} />
                 <Controller name="status" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Estado *" fullWidth error={!!errors.status} helperText={errors.status?.message ?? ' '}>
-                    <MenuItem value="Draft">Borrador</MenuItem>
-                    <MenuItem value="Active">Vigente</MenuItem>
-                    <MenuItem value="PendingRenewal">Pendiente Renovación</MenuItem>
-                    <MenuItem value="Expired">Vencida</MenuItem>
-                    <MenuItem value="Cancelled">Cancelada</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Estado *"
+                    error={!!errors.status}
+                    helperText={errors.status?.message ?? ' '}
+                    options={[
+                      { value: 'Draft', label: 'Borrador' },
+                      { value: 'Active', label: 'Vigente' },
+                      { value: 'PendingRenewal', label: 'Pendiente Renovación' },
+                      { value: 'Expired', label: 'Vencida' },
+                      { value: 'Cancelled', label: 'Cancelada' }
+                    ]}
+                  />
                 )} />
               </Stack>
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Controller name="clientUuid" control={control} render={({ field }) => (
-                  <Autocomplete
-                    disablePortal
-                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
+                  <ResponsiveAutocomplete
                     options={clients ?? []}
                     getOptionLabel={(option: ClientRaw) => option.displayName}
                     value={(clients ?? []).find((client) => client.uuid === field.value) ?? null}
                     onChange={(_, newValue) => field.onChange(newValue?.uuid ?? '')}
                     isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
                     noOptionsText="Sin resultados"
-                    fullWidth
-                    renderInput={(params) => (
-                      <TextField {...params} type="text" label="Cliente *" error={!!errors.clientUuid} helperText={errors.clientUuid?.message ?? ' '} />
-                    )}
+                    label="Cliente *"
+                    error={!!errors.clientUuid}
+                    helperText={errors.clientUuid?.message ?? ' '}
                   />
                 )} />
                 <Controller name="providerUuid" control={control} render={({ field }) => (
-                  <Autocomplete
-                    disablePortal
-                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
+                  <ResponsiveAutocomplete
                     options={providers ?? []}
                     getOptionLabel={(option: ProviderRaw) => option.name}
                     value={(providers ?? []).find((provider) => provider.uuid === field.value) ?? null}
@@ -625,19 +628,16 @@ export function PoliciesMaintenancePage() {
                     }}
                     isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
                     noOptionsText="Sin resultados"
-                    fullWidth
-                    renderInput={(params) => (
-                      <TextField {...params} type="text" label="Proveedor *" error={!!errors.providerUuid} helperText={errors.providerUuid?.message ?? ' '} />
-                    )}
+                    label="Proveedor *"
+                    error={!!errors.providerUuid}
+                    helperText={errors.providerUuid?.message ?? ' '}
                   />
                 )} />
               </Stack>
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Controller name="productUuid" control={control} render={({ field }) => (
-                  <Autocomplete
-                    disablePortal
-                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
+                  <ResponsiveAutocomplete
                     options={productOptions}
                     getOptionLabel={(option: ProductRaw) => option.name}
                     value={productOptions.find((product) => product.uuid === field.value) ?? null}
@@ -645,17 +645,22 @@ export function PoliciesMaintenancePage() {
                     isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
                     noOptionsText={selectedProviderUuid ? 'Sin productos para este proveedor' : 'Selecciona un proveedor primero'}
                     disabled={!selectedProviderUuid}
-                    fullWidth
-                    renderInput={(params) => (
-                      <TextField {...params} type="text" label="Producto *" error={!!errors.productUuid} helperText={errors.productUuid?.message ?? ' '} />
-                    )}
+                    label="Producto *"
+                    error={!!errors.productUuid}
+                    helperText={errors.productUuid?.message ?? ' '}
                   />
                 )} />
                 <Controller name="currency" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Moneda *" fullWidth error={!!errors.currency} helperText={errors.currency?.message ?? ' '}>
-                    <MenuItem value="GTQ">Quetzales (GTQ)</MenuItem>
-                    <MenuItem value="USD">Dólares (USD)</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Moneda *"
+                    error={!!errors.currency}
+                    helperText={errors.currency?.message ?? ' '}
+                    options={[
+                      { value: 'GTQ', label: 'Quetzales (GTQ)' },
+                      { value: 'USD', label: 'Dólares (USD)' }
+                    ]}
+                  />
                 )} />
               </Stack>
 
@@ -731,17 +736,14 @@ export function PoliciesMaintenancePage() {
                 )} />
               </Stack>
 
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Controller name="billingFrequency" control={control} render={({ field }) => (
-                  <TextField
+                  <ResponsiveSelect
                     {...field}
-                    select
                     label="Periodicidad de Cobro"
-                    fullWidth
                     error={!!errors.billingFrequency}
                     helperText={errors.billingFrequency?.message?.toString() ?? ' '}
-                    onChange={(e) => {
-                      const val = e.target.value
+                    onChange={(val) => {
                       field.onChange(val)
                       // Auto-populate default installments based on frequency
                       if (val === 'single') {
@@ -770,138 +772,108 @@ export function PoliciesMaintenancePage() {
                         setValue('installmentAmount', Number((Number(premium) / insts).toFixed(2)))
                       }
                     }}
-                  >
-                    <MenuItem value="">Ninguna</MenuItem>
-                    <MenuItem value="single">Pago Único</MenuItem>
-                    <MenuItem value="monthly">Mensual</MenuItem>
-                    <MenuItem value="quarterly">Trimestral</MenuItem>
-                    <MenuItem value="semi_annually">Semestral</MenuItem>
-                    <MenuItem value="annually">Anual</MenuItem>
-                  </TextField>
+                    options={[
+                      { value: '', label: 'Ninguna' },
+                      { value: 'single', label: 'Pago Único' },
+                      { value: 'monthly', label: 'Mensual' },
+                      { value: 'quarterly', label: 'Trimestral' },
+                      { value: 'semi_annually', label: 'Semestral' },
+                      { value: 'annually', label: 'Anual' }
+                    ]}
+                  />
                 )} />
               </Stack>
-
-              {watchedBillingFrequency && watchedBillingFrequency !== 'single' && (
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <Controller name="billingInstallments" control={control} render={({ field }) => (
-                    <TextField
-                      {...field}
-                      value={field.value ?? ''}
-                      type="number"
-                      label="Número de Cuotas *"
-                      fullWidth
-                      error={!!errors.billingInstallments}
-                      helperText={errors.billingInstallments?.message?.toString() ?? ' '}
-                      onChange={(e) => {
-                        const val = e.target.value ? Number(e.target.value) : undefined
-                        field.onChange(val)
-                        const premium = watch('premiumAmount')
-                        if (premium && val) {
-                          setValue('installmentAmount', Number((Number(premium) / val).toFixed(2)))
-                        }
-                      }}
-                    />
-                  )} />
-                  <Controller name="installmentAmount" control={control} render={({ field }) => (
-                    <TextField
-                      {...field}
-                      value={field.value ?? ''}
-                      type="number"
-                      label="Monto por Cuota *"
-                      fullWidth
-                      error={!!errors.installmentAmount}
-                      helperText={errors.installmentAmount?.message?.toString() ?? ' '}
-                    />
-                  )} />
-                </Stack>
-              )}
-
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <Controller name="paymentMethod" control={control} render={({ field }) => (
-                  <TextField
-                    {...field}
-                    select
-                    label="Método de Pago"
-                    fullWidth
-                    error={!!errors.paymentMethod}
-                    helperText={errors.paymentMethod?.message?.toString() ?? ' '}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      field.onChange(val)
-                      if (val !== 'card') {
-                        setValue('cardBrand', '')
-                        setValue('cardLastFour', '')
-                      }
-                    }}
-                  >
-                    <MenuItem value="">Ninguno</MenuItem>
-                    <MenuItem value="card">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <CreditCard size={18} style={{ opacity: 0.8 }} />
-                        <span>Tarjeta de Crédito/Débito</span>
-                      </Box>
-                    </MenuItem>
-                    <MenuItem value="transfer">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <ArrowRightLeft size={18} style={{ opacity: 0.8 }} />
-                        <span>Transferencia Bancaria</span>
-                      </Box>
-                    </MenuItem>
-                    <MenuItem value="cash">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Banknote size={18} style={{ opacity: 0.8 }} />
-                        <span>Efectivo</span>
-                      </Box>
-                    </MenuItem>
-                  </TextField>
-                )} />
-              </Stack>
-
-              {watchedPaymentMethod === 'card' && (
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <Controller name="cardBrand" control={control} render={({ field }) => (
-                    <TextField {...field} select label="Franquicia *" fullWidth error={!!errors.cardBrand} helperText={errors.cardBrand?.message?.toString() ?? ' '}>
-                      <MenuItem value="">Selecciona...</MenuItem>
-                      <MenuItem value="visa">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <img src="/cards/visa.svg" alt="Visa" style={{ height: 16, width: 'auto' }} />
-                          <span>Visa</span>
-                        </Box>
-                      </MenuItem>
-                      <MenuItem value="mastercard">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <img src="/cards/mastercard.svg" alt="Mastercard" style={{ height: 22, width: 'auto' }} />
-                          <span>Mastercard</span>
-                        </Box>
-                      </MenuItem>
-                      <MenuItem value="amex">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <img src="/cards/amex.svg" alt="American Express" style={{ height: 16, width: 'auto' }} />
-                          <span>American Express (AMEX)</span>
-                        </Box>
-                      </MenuItem>
-                      <MenuItem value="other">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <CreditCard size={16} />
-                          <span>Otra</span>
-                        </Box>
-                      </MenuItem>
-                    </TextField>
-                  )} />
-                  <Controller name="cardLastFour" control={control} render={({ field }) => (
-                    <TextField
-                      {...field}
-                      type="text"
-                      label="Últimos 4 dígitos *"
-                      fullWidth
-                      placeholder="1234"
-                      slotProps={{ htmlInput: { maxLength: 4 } }}
-                      error={!!errors.cardLastFour}
-                      helperText={errors.cardLastFour?.message?.toString() ?? ' '}
-                    />
-                  )} />
-                </Stack>
-              )}
+ 
+               {watchedBillingFrequency && watchedBillingFrequency !== 'single' && (
+                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                   <Controller name="billingInstallments" control={control} render={({ field }) => (
+                     <TextField
+                       {...field}
+                       value={field.value ?? ''}
+                       type="number"
+                       label="Número de Cuotas *"
+                       fullWidth
+                       error={!!errors.billingInstallments}
+                       helperText={errors.billingInstallments?.message?.toString() ?? ' '}
+                       onChange={(e) => {
+                         const val = e.target.value ? Number(e.target.value) : undefined
+                         field.onChange(val)
+                         const premium = watch('premiumAmount')
+                         if (premium && val) {
+                           setValue('installmentAmount', Number((Number(premium) / val).toFixed(2)))
+                         }
+                       }}
+                     />
+                   )} />
+                   <Controller name="installmentAmount" control={control} render={({ field }) => (
+                     <TextField
+                       {...field}
+                       value={field.value ?? ''}
+                       type="number"
+                       label="Monto por Cuota *"
+                       fullWidth
+                       error={!!errors.installmentAmount}
+                       helperText={errors.installmentAmount?.message?.toString() ?? ' '}
+                     />
+                   )} />
+                 </Stack>
+               )}
+ 
+               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                 <Controller name="paymentMethod" control={control} render={({ field }) => (
+                   <ResponsiveSelect
+                     {...field}
+                     label="Método de Pago"
+                     error={!!errors.paymentMethod}
+                     helperText={errors.paymentMethod?.message?.toString() ?? ' '}
+                     onChange={(val) => {
+                       field.onChange(val)
+                       if (val !== 'card') {
+                         setValue('cardBrand', '')
+                         setValue('cardLastFour', '')
+                       }
+                     }}
+                     options={[
+                       { value: '', label: 'Ninguno' },
+                       { value: 'card', label: 'Tarjeta de Crédito/Débito', icon: <CreditCard size={18} /> },
+                       { value: 'transfer', label: 'Transferencia Bancaria', icon: <ArrowRightLeft size={18} /> },
+                       { value: 'cash', label: 'Efectivo', icon: <Banknote size={18} /> }
+                     ]}
+                   />
+                 )} />
+               </Stack>
+ 
+               {watchedPaymentMethod === 'card' && (
+                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                   <Controller name="cardBrand" control={control} render={({ field }) => (
+                     <ResponsiveSelect
+                       {...field}
+                       label="Franquicia *"
+                       error={!!errors.cardBrand}
+                       helperText={errors.cardBrand?.message?.toString() ?? ' '}
+                       options={[
+                         { value: '', label: 'Selecciona...' },
+                         { value: 'visa', label: 'Visa', icon: <img src="/cards/visa.svg" alt="Visa" style={{ height: 16, width: 'auto' }} /> },
+                         { value: 'mastercard', label: 'Mastercard', icon: <img src="/cards/mastercard.svg" alt="Mastercard" style={{ height: 22, width: 'auto' }} /> },
+                         { value: 'amex', label: 'American Express (AMEX)', icon: <img src="/cards/amex.svg" alt="American Express" style={{ height: 16, width: 'auto' }} /> },
+                         { value: 'other', label: 'Otra', icon: <CreditCard size={16} /> }
+                       ]}
+                     />
+                   )} />
+                   <Controller name="cardLastFour" control={control} render={({ field }) => (
+                     <TextField
+                       {...field}
+                       type="text"
+                       label="Últimos 4 dígitos *"
+                       fullWidth
+                       placeholder="1234"
+                       slotProps={{ htmlInput: { maxLength: 4 } }}
+                       error={!!errors.cardLastFour}
+                       helperText={errors.cardLastFour?.message?.toString() ?? ' '}
+                     />
+                   )} />
+                 </Stack>
+               )}
 
               <Controller name="notes" control={control} render={({ field }) => (
                 <TextField {...field} value={field.value ?? ''} label="Notas / Observaciones" multiline rows={3} fullWidth error={!!errors.notes} helperText={(errors.notes as any)?.message ?? ' '} />

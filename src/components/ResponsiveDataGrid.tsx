@@ -1,4 +1,4 @@
-import { Box, Checkbox, Stack, TablePagination, Typography, useMediaQuery, useTheme } from '@mui/material'
+import { Box, Checkbox, Skeleton, Stack, TablePagination, Typography, useMediaQuery, useTheme } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import type { DataGridProps, GridColDef, GridRowId, GridRowSelectionModel, GridValidRowModel } from '@mui/x-data-grid'
 import { useCallback, type ReactNode } from 'react'
@@ -143,6 +143,8 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
   } as const
 
   if (isMobile) {
+    const isLoading = Boolean(props.loading)
+
     return (
       <Box
         sx={{
@@ -160,7 +162,33 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
         }}
       >
         <Stack spacing={1.25} sx={{ p: 1.25 }}>
-          {mobileRows.map((row) => {
+          {isLoading && mobileRows.length === 0
+            ? Array.from({ length: Math.min(pageSize, 6) }).map((_, index) => (
+              <Box
+                key={index}
+                sx={{
+                  px: 2,
+                  py: 1.5,
+                  borderRadius: 3,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'background.paper',
+                }}
+              >
+                <Stack spacing={1.25}>
+                  <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                    {props.checkboxSelection && <Skeleton variant="rounded" width={28} height={28} sx={{ borderRadius: 1.5 }} />}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Skeleton variant="text" width="72%" height={24} />
+                      <Skeleton variant="text" width="44%" height={16} />
+                    </Box>
+                  </Stack>
+                  <Skeleton variant="rounded" width="100%" height={12} sx={{ borderRadius: 99 }} />
+                  <Skeleton variant="text" width="64%" height={18} />
+                </Stack>
+              </Box>
+            ))
+            : mobileRows.map((row) => {
             const id = getRowId(row)
             const selected = isMobileRowSelected(id)
             return (
@@ -197,10 +225,10 @@ export function ResponsiveDataGrid<R extends GridValidRowModel>({
               </Box>
             )
           })}
-          {mobileRows.length === 0 && (
+          {!isLoading && mobileRows.length === 0 && (
             <Box sx={{ px: 2, py: 5, textAlign: 'center' }}>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {props.loading ? 'Cargando...' : 'No hay filas'}
+                No hay filas
               </Typography>
             </Box>
           )}

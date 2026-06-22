@@ -30,6 +30,7 @@ export function AppShell({ mode, onToggleMode }: AppShellProps) {
     const releasePointerFocus = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null
       if (!target?.closest('button, [role="button"], .MuiButtonBase-root')) return
+      if (target?.closest('.MuiSpeedDial-root, .MuiSpeedDialAction-root')) return
 
       window.requestAnimationFrame(() => {
         const activeElement = document.activeElement

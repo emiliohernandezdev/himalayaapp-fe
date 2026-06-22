@@ -4,7 +4,7 @@ import { useErrorStore } from '../store/useErrorStore'
 import { graphqlOperationIds } from './graphqlOperationIds'
 import type { GraphqlOperationId } from './graphqlOperationIds'
 
-const graphqlEndpoint = import.meta.env.VITE_GRAPHQL_URL ?? 'http://localhost:3000/graphql'
+const graphqlEndpoint = import.meta.env.VITE_GRAPHQL_URL ?? 'https://himalayaapp-be.vercel.app/graphql'
 export const sessionExpiredMessage = 'Tu sesión expiró.'
 
 type GraphqlResponse<TData> = {

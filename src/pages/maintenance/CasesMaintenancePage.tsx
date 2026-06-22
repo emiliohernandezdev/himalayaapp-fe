@@ -22,6 +22,8 @@ import { MaintenanceSkeleton } from '../../components/MaintenanceSkeleton'
 import { MaintenanceFab } from '../../components/MaintenanceFab'
 import { subscribeAppEvent } from '../../utils/appEvents'
 import { createEmptyGridSelectionModel, getSelectedGridIds } from '../../utils/gridSelection'
+import { ResponsiveSelect } from '../../components/ResponsiveSelect'
+import { ResponsiveAutocomplete } from '../../components/ResponsiveAutocomplete'
 
 /** Sanitize backend errors for user display */
 function friendlyError(err: any, fallback = 'Ocurrió un error inesperado.'): string {
@@ -1754,19 +1756,7 @@ export function CasesMaintenancePage() {
     return list.filter((p) => p.clientUuid === formClientId || p.client?.uuid === formClientId)
   }, [policies, formClientId])
 
-  const [policiesLoading, setPoliciesLoading] = useState(false)
 
-  useEffect(() => {
-    if (formClientId) {
-      setPoliciesLoading(true)
-      const timer = setTimeout(() => {
-        setPoliciesLoading(false)
-      }, 400)
-      return () => clearTimeout(timer)
-    } else {
-      setPoliciesLoading(false)
-    }
-  }, [formClientId])
 
   // Clear policyId only when the CLIENT changes and the current policy no longer belongs to it.
   // This effect must NOT depend on formPolicyId — otherwise every policy selection re-triggers it.
@@ -1869,35 +1859,53 @@ export function CasesMaintenancePage() {
 
               <Stack direction="row" spacing={2}>
                 <Controller name="type" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Tipo *" fullWidth error={!!errors.type} helperText={errors.type?.message ?? ' '}>
-                    <MenuItem value="Claim">Reclamo</MenuItem>
-                    <MenuItem value="Renewal">Renovación</MenuItem>
-                    <MenuItem value="Endorsement">Endoso</MenuItem>
-                    <MenuItem value="Payment">Pago</MenuItem>
-                    <MenuItem value="Documentation">Documentación</MenuItem>
-                    <MenuItem value="GeneralSupport">Soporte General</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Tipo *"
+                    error={!!errors.type}
+                    helperText={errors.type?.message ?? ' '}
+                    options={[
+                      { value: 'Claim', label: 'Reclamo' },
+                      { value: 'Renewal', label: 'Renovación' },
+                      { value: 'Endorsement', label: 'Endoso' },
+                      { value: 'Payment', label: 'Pago' },
+                      { value: 'Documentation', label: 'Documentación' },
+                      { value: 'GeneralSupport', label: 'Soporte General' }
+                    ]}
+                  />
                 )} />
                 <Controller name="priority" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Prioridad *" fullWidth error={!!errors.priority} helperText={errors.priority?.message ?? ' '}>
-                    <MenuItem value="Low">Baja</MenuItem>
-                    <MenuItem value="Medium">Media</MenuItem>
-                    <MenuItem value="High">Alta</MenuItem>
-                    <MenuItem value="Urgent">Urgente</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Prioridad *"
+                    error={!!errors.priority}
+                    helperText={errors.priority?.message ?? ' '}
+                    options={[
+                      { value: 'Low', label: 'Baja' },
+                      { value: 'Medium', label: 'Media' },
+                      { value: 'High', label: 'Alta' },
+                      { value: 'Urgent', label: 'Urgente' }
+                    ]}
+                  />
                 )} />
               </Stack>
 
               <Stack direction="row" spacing={2}>
                 <Controller name="status" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Estado *" fullWidth error={!!errors.status} helperText={errors.status?.message ?? ' '}>
-                    <MenuItem value="Pending">Pendiente</MenuItem>
-                    <MenuItem value="InProgress">En Progreso</MenuItem>
-                    <MenuItem value="WaitingForClient">Esperando Cliente</MenuItem>
-                    <MenuItem value="WaitingForProvider">Esperando Proveedor</MenuItem>
-                    <MenuItem value="Closed">Cerrado</MenuItem>
-                    <MenuItem value="Cancelled">Cancelado</MenuItem>
-                  </TextField>
+                  <ResponsiveSelect
+                    {...field}
+                    label="Estado *"
+                    error={!!errors.status}
+                    helperText={errors.status?.message ?? ' '}
+                    options={[
+                      { value: 'Pending', label: 'Pendiente' },
+                      { value: 'InProgress', label: 'En Progreso' },
+                      { value: 'WaitingForClient', label: 'Esperando Cliente' },
+                      { value: 'WaitingForProvider', label: 'Esperando Proveedor' },
+                      { value: 'Closed', label: 'Cerrado' },
+                      { value: 'Cancelled', label: 'Cancelado' }
+                    ]}
+                  />
                 )} />
                 <Controller
                   name="dueAt"
@@ -1924,25 +1932,20 @@ export function CasesMaintenancePage() {
 
               <Stack direction="row" spacing={2}>
                 <Controller name="clientId" control={control} render={({ field }) => (
-                  <Autocomplete
-                    disablePortal
-                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
+                  <ResponsiveAutocomplete
                     options={clientOptions}
                     getOptionLabel={(option: ClientRaw) => option.displayName}
                     value={clientOptions.find((c) => c.uuid === field.value) ?? null}
                     onChange={(_, newValue) => field.onChange(newValue?.uuid ?? '')}
                     isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
                     noOptionsText="Sin resultados"
-                    fullWidth
-                    renderInput={(params) => (
-                      <TextField {...params} type="text" label="Cliente *" error={!!errors.clientId} helperText={errors.clientId?.message?.toString() ?? ' '} />
-                    )}
+                    label="Cliente *"
+                    error={!!errors.clientId}
+                    helperText={errors.clientId?.message?.toString() ?? ' '}
                   />
                 )} />
                 <Controller name="policyId" control={control} render={({ field }) => (
-                  <Autocomplete
-                    disablePortal
-                    slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
+                  <ResponsiveAutocomplete
                     options={policyOptions}
                     getOptionLabel={(option: PolicyRaw) => option.policyNumber}
                     value={policyOptions.find((p) => p.uuid === field.value) ?? null}
@@ -1950,50 +1953,25 @@ export function CasesMaintenancePage() {
                     isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
                     noOptionsText={formClientId ? "Sin resultados" : "Selecciona un cliente primero"}
                     disabled={!formClientId}
-                    loading={policiesLoading}
-                    fullWidth
-                    renderInput={(params) => {
-                      const { slotProps, ...restParams } = params
-                      return (
-                        <TextField
-                          {...restParams}
-                          type="text"
-                          label="Póliza Asociada"
-                          error={!!errors.policyId}
-                          helperText={errors.policyId?.message?.toString() ?? ' '}
-                          slotProps={{
-                            ...slotProps,
-                            input: {
-                              ...slotProps.input,
-                              endAdornment: (
-                                <>
-                                  {policiesLoading ? <CircularProgress color="inherit" size={20} /> : null}
-                                  {slotProps.input.endAdornment}
-                                </>
-                              ),
-                            },
-                          }}
-                        />
-                      )
-                    }}
+                    label="Póliza Asociada"
+                    error={!!errors.policyId}
+                    helperText={errors.policyId?.message?.toString() ?? ' '}
                   />
                 )} />
               </Stack>
 
               <Controller name="assignedUserId" control={control} render={({ field }) => (
-                <Autocomplete
-                  disablePortal
-                  slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
+                <ResponsiveAutocomplete
                   options={userOptions}
                   getOptionLabel={(option: UserRaw) => `${option.firstName} ${option.lastName} (${option.email})`}
+                  getOptionSubtitle={(option: UserRaw) => option.email}
                   value={userOptions.find((u) => u.uuid === field.value) ?? null}
                   onChange={(_, newValue) => field.onChange(newValue?.uuid ?? '')}
                   isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
                   noOptionsText="Sin resultados"
-                  fullWidth
-                  renderInput={(params) => (
-                    <TextField {...params} type="text" label="Responsable Asignado" error={!!errors.assignedUserId} helperText={errors.assignedUserId?.message?.toString() ?? ' '} />
-                  )}
+                  label="Responsable Asignado"
+                  error={!!errors.assignedUserId}
+                  helperText={errors.assignedUserId?.message?.toString() ?? ' '}
                   renderOption={(props: React.HTMLAttributes<HTMLLIElement> & { key: React.Key }, option: UserRaw) => {
                     const { key, ...optionProps } = props;
                     const initials = `${option.firstName?.[0] ?? ''}${option.lastName?.[0] ?? ''}`.toUpperCase()
@@ -2018,21 +1996,21 @@ export function CasesMaintenancePage() {
                 />
               )} />
 
-              <Controller name="tagUuids" control={control} render={({ field }) => (
+               <Controller name="tagUuids" control={control} render={({ field }) => (
                 <Autocomplete
                   multiple
-                  disablePortal
+                  disablePortal={false}
                   slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' } } }}
                   options={tags ?? []}
                   getOptionLabel={(option: TagRaw) => option.name}
                   value={(tags ?? []).filter((t) => (field.value ?? []).includes(t.uuid))}
-                  onChange={(_, newValue) => {
-                    field.onChange(newValue.map((v) => v.uuid))
+                  onChange={(_: any, newValue: TagRaw[]) => {
+                    field.onChange(newValue.map((v: TagRaw) => v.uuid))
                   }}
-                  isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
+                  isOptionEqualToValue={(option: TagRaw, value: TagRaw) => option.uuid === value.uuid}
                   noOptionsText="Sin resultados"
                   fullWidth
-                  renderInput={(params) => (
+                  renderInput={(params: any) => (
                     <TextField {...params} type="text" label="Etiquetas" error={!!errors.tagUuids} helperText={errors.tagUuids?.message ?? ' '} />
                   )}
                   renderValue={(tagValue: TagRaw[], getItemProps: any) =>

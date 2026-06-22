@@ -194,6 +194,37 @@ body {
   .dashboard-grid {
     min-height: 0;
   }
+
+  .MuiDialog-paper {
+    width: calc(100% - 24px) !important;
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    margin: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .MuiDialogContent-root {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .MuiAutocomplete-popper,
+  .MuiPopover-root {
+    z-index: 1600 !important;
+  }
+
+  .MuiAutocomplete-listbox,
+  .MuiMenu-list {
+    max-height: min(42dvh, 320px) !important;
+    overscroll-behavior: contain;
+  }
+
+  .MuiFormControl-root,
+  .MuiTextField-root,
+  .MuiAutocomplete-root {
+    min-width: 0;
+  }
+
+  .MuiInputBase-root {
+    min-height: 52px;
+  }
 }
 
 /* Styling Mui Charts components to blend with the dashboard theme colors */
